@@ -104,16 +104,16 @@ export default function ProfileScreen({ navigation }) {
                         source={require('../../assets/HubsImages/student_avatar.jpg')}
                     />
                     <View style={styles.profileInfo}>
-                        <Text style={styles.profileName}>Dubovis Olivia</Text>
+                        <Text style={styles.profileName}>Nina Keller</Text>
                         <View style={styles.profileDetailRow}>
                             <Ionicons name="mail-outline" size={16} color={colors.bluePrimary}
                                 style={styles.profileDetailIcon} />
-                            <Text style={styles.profileDetailText}>dubovsliliha@gmail.com</Text>
+                            <Text style={styles.profileDetailText}>Nina.Keller@gmail.com</Text>
                         </View>
                         <View style={styles.profileDetailRow}>
                             <Ionicons name="school-outline" size={16} color={colors.bluePrimary}
                                 style={styles.profileDetailIcon} />
-                            <Text style={styles.profileDetailText}>University of Vienna</Text>
+                            <Text style={styles.profileDetailText}>TU</Text>
                         </View>
                         <View style={styles.profileDetailRow}>
                             <Ionicons name="calendar-outline" size={16} color={colors.bluePrimary}
