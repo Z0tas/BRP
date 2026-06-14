@@ -1,30 +1,16 @@
-import React, {useState} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, Animated} from 'react-native';
-import {AnimatedCircularProgress} from 'react-native-circular-progress';
-import {Ionicons, MaterialCommunityIcons, MaterialIcons} from '@expo/vector-icons';
-import {colors} from '../theme/colors';
-import {shadow} from '../theme/shadow';
-import {ScrollView} from 'react-native-gesture-handler';
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal } from 'react-native';
+import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { colors } from '../theme/colors';
+import { shadow } from '../theme/shadow';
+import { ScrollView } from 'react-native-gesture-handler';
 import {
     useFonts,
-    Poppins_100Thin,
-    Poppins_100Thin_Italic,
-    Poppins_200ExtraLight,
-    Poppins_200ExtraLight_Italic,
-    Poppins_300Light,
-    Poppins_300Light_Italic,
     Poppins_400Regular,
-    Poppins_400Regular_Italic,
     Poppins_500Medium,
-    Poppins_500Medium_Italic,
     Poppins_600SemiBold,
-    Poppins_600SemiBold_Italic,
     Poppins_700Bold,
-    Poppins_700Bold_Italic,
-    Poppins_800ExtraBold,
-    Poppins_800ExtraBold_Italic,
-    Poppins_900Black,
-    Poppins_900Black_Italic,
 } from '@expo-google-fonts/poppins';
 
 const metrics = [
@@ -33,7 +19,7 @@ const metrics = [
         value: 4.3,
         goal: 7,
         unit: 'km',
-        icon: <MaterialIcons name="route" size={24} color={colors.bluePrimary}/>,
+        icon: <MaterialIcons name="route" size={24} color={colors.bluePrimary} />,
         color: colors.bluePrimary,
         ringSize: 280,
     },
@@ -42,7 +28,7 @@ const metrics = [
         value: 1800,
         goal: 2000,
         unit: 'kcal',
-        icon: <Ionicons name="flame-outline" size={24} color={colors.orangePrimary}/>,
+        icon: <Ionicons name="flame-outline" size={24} color={colors.orangePrimary} />,
         color: colors.orangePrimary,
         ringSize: 220,
     },
@@ -51,19 +37,19 @@ const metrics = [
         value: 1.9,
         goal: 2,
         unit: 'l',
-        icon: <Ionicons name="water-outline" size={24} color={colors.cyanPrimary}/>,
+        icon: <Ionicons name="water-outline" size={24} color={colors.cyanPrimary} />,
         color: colors.cyanPrimary,
         ringSize: 160,
     },
 ];
 
 const initialTasks = [
-    {label: 'Drink 2 liters of water', completed: false, xp: 10},
-    {label: 'Eat 5 servings of vegetables', completed: false, xp: 20},
-    {label: 'Walk 10,000 steps', completed: false, xp: 25},
-    {label: 'Avoid sugary snacks', completed: false, xp: 15},
-    {label: 'Sleep at least 7 hours', completed: false, xp: 30},
-    {label: 'Do 30 minutes of exercise', completed: false, xp: 35},
+    { label: 'Drink 2 liters of water', completed: false, xp: 10 },
+    { label: 'Eat 5 servings of vegetables', completed: false, xp: 20 },
+    { label: 'Walk 10,000 steps', completed: false, xp: 25 },
+    { label: 'Avoid sugary snacks', completed: false, xp: 15 },
+    { label: 'Sleep at least 7 hours', completed: false, xp: 30 },
+    { label: 'Do 30 minutes of exercise', completed: false, xp: 35 },
 ];
 
 const XP_GOAL = initialTasks.reduce((total, task) => total + task.xp, 0);
@@ -73,64 +59,53 @@ const mealData = [
         label: 'Breakfast',
         icon: 'egg-fried',
         dishes: [
-            {name: 'Oatmeal with berries', kcal: 150, protein: 5, carbs: 30, fat: 3},
-            {name: 'Scrambled eggs', kcal: 170, protein: 12, carbs: 2, fat: 12},
-            {name: 'Orange juice', kcal: 100, protein: 2, carbs: 22, fat: 0},
+            { name: 'Oatmeal with berries', kcal: 150, protein: 5, carbs: 30, fat: 3 },
+            { name: 'Scrambled eggs', kcal: 170, protein: 12, carbs: 2, fat: 12 },
+            { name: 'Orange juice', kcal: 100, protein: 2, carbs: 22, fat: 0 },
         ],
     },
     {
         label: 'Snack',
         icon: 'food-croissant',
         dishes: [
-            {name: 'Greek yogurt', kcal: 100, protein: 10, carbs: 8, fat: 0},
-            {name: 'Almonds', kcal: 100, protein: 4, carbs: 4, fat: 9},
+            { name: 'Greek yogurt', kcal: 100, protein: 10, carbs: 8, fat: 0 },
+            { name: 'Almonds', kcal: 100, protein: 4, carbs: 4, fat: 9 },
         ],
     },
     {
         label: 'Lunch',
         icon: 'hamburger',
         dishes: [
-            {name: 'Grilled chicken breast', kcal: 250, protein: 40, carbs: 0, fat: 5},
-            {name: 'Brown rice', kcal: 200, protein: 5, carbs: 45, fat: 2},
-            {name: 'Steamed broccoli', kcal: 150, protein: 5, carbs: 10, fat: 0},
+            { name: 'Grilled chicken breast', kcal: 250, protein: 40, carbs: 0, fat: 5 },
+            { name: 'Brown rice', kcal: 200, protein: 5, carbs: 45, fat: 2 },
+            { name: 'Steamed broccoli', kcal: 150, protein: 5, carbs: 10, fat: 0 },
         ],
     },
     {
         label: 'Dinner',
         icon: 'noodles',
         dishes: [
-            {name: 'Pasta with tomato sauce', kcal: 400, protein: 15, carbs: 60, fat: 7},
-            {name: 'Side salad', kcal: 150, protein: 3, carbs: 10, fat: 10},
+            { name: 'Pasta with tomato sauce', kcal: 400, protein: 15, carbs: 60, fat: 7 },
+            { name: 'Side salad', kcal: 150, protein: 3, carbs: 10, fat: 10 },
         ],
-    }
+    },
 ];
 
 export default function HomeScreen() {
     const [tasks, setTasks] = useState(initialTasks);
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new global.Date());
+
     const totalXp = tasks.reduce(
         (acc, task) => acc + (task.completed ? task.xp : 0),
         0
     );
 
-    let [fontsLoaded] = useFonts({
-        Poppins_100Thin,
-        Poppins_100Thin_Italic,
-        Poppins_200ExtraLight,
-        Poppins_200ExtraLight_Italic,
-        Poppins_300Light,
-        Poppins_300Light_Italic,
+    const [fontsLoaded] = useFonts({
         Poppins_400Regular,
-        Poppins_400Regular_Italic,
         Poppins_500Medium,
-        Poppins_500Medium_Italic,
         Poppins_600SemiBold,
-        Poppins_600SemiBold_Italic,
         Poppins_700Bold,
-        Poppins_700Bold_Italic,
-        Poppins_800ExtraBold,
-        Poppins_800ExtraBold_Italic,
-        Poppins_900Black,
-        Poppins_900Black_Italic
     });
 
     if (!fontsLoaded) {
@@ -138,39 +113,192 @@ export default function HomeScreen() {
     }
 
     return (
-        <ScrollView style={styles.container}>
-            <Header/>
-            <Date/>
-            <RingsMetrics/>
-            <XPSection totalXp={totalXp}/>
-            <TodayTasks tasks={tasks} setTasks={setTasks}/>
-            <CaloriesCounter/>
-        </ScrollView>
+        <>
+            <ScrollView style={styles.container}>
+                <Header onCalendarPress={() => setShowCalendar(true)} />
+
+                <Date
+                    selectedDate={selectedDate}
+                    setSelectedDate={setSelectedDate}
+                />
+
+                <RingsMetrics />
+                <XPSection totalXp={totalXp} />
+                <TodayTasks tasks={tasks} setTasks={setTasks} />
+                <CaloriesCounter />
+            </ScrollView>
+
+            <CalendarModal
+                visible={showCalendar}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                onClose={() => setShowCalendar(false)}
+            />
+        </>
     );
 }
 
-function Header() {
-    return (<View style={styles.header}>
-        <Text style={styles.headerTitle}>Day 1</Text>
-        <TouchableOpacity>
-            <Ionicons name="calendar-outline" size={24} color={colors.bluePrimary}/>
-        </TouchableOpacity>
-    </View>);
-}
-
-function Date() {
+function Header({ onCalendarPress }) {
     return (
-        <View style={styles.dateRow}>
-            <TouchableOpacity>
-                <MaterialCommunityIcons name="chevron-left" size={40} color={colors.bluePrimary}/>
-            </TouchableOpacity>
-            <View style={styles.dateBox}>
-                <Text style={styles.dateText}>Mon, 14 Apr</Text>
-            </View>
-            <TouchableOpacity>
-                <MaterialCommunityIcons name="chevron-right" size={40} color={colors.bluePrimary}/>
+        <View style={styles.header}>
+            <Text style={styles.headerTitle}>Day 1</Text>
+
+            <TouchableOpacity onPress={onCalendarPress}>
+                <Ionicons name="calendar-outline" size={24} color={colors.bluePrimary} />
             </TouchableOpacity>
         </View>
+    );
+}
+
+function Date({ selectedDate, setSelectedDate }) {
+    const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const formatEUDate = (date) => {
+        const weekday = weekdayNames[date.getDay()];
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+
+        return `${weekday}, ${day}.${month}.${year}`;
+    };
+
+    const changeDay = (amount) => {
+        const newDate = new global.Date(selectedDate);
+        newDate.setDate(newDate.getDate() + amount);
+        setSelectedDate(newDate);
+    };
+
+    return (
+        <View style={styles.dateRow}>
+            <TouchableOpacity onPress={() => changeDay(-1)}>
+                <MaterialCommunityIcons name="chevron-left" size={40} color={colors.bluePrimary} />
+            </TouchableOpacity>
+
+            <View style={styles.dateBox}>
+                <Text style={styles.dateText}>{formatEUDate(selectedDate)}</Text>
+            </View>
+
+            <TouchableOpacity onPress={() => changeDay(1)}>
+                <MaterialCommunityIcons name="chevron-right" size={40} color={colors.bluePrimary} />
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+function CalendarModal({ visible, selectedDate, setSelectedDate, onClose }) {
+    const today = new global.Date();
+
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    const [calendarMonth, setCalendarMonth] = useState(
+        new global.Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+    );
+
+    const changeMonth = (amount) => {
+        const newDate = new global.Date(calendarMonth);
+        newDate.setMonth(newDate.getMonth() + amount);
+        setCalendarMonth(newDate);
+    };
+
+    const calendarDays = useMemo(() => {
+        const year = calendarMonth.getFullYear();
+        const month = calendarMonth.getMonth();
+
+        const firstDay = new global.Date(year, month, 1);
+        const lastDay = new global.Date(year, month + 1, 0);
+
+        const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+        const days = [];
+
+        for (let i = 0; i < startOffset; i++) {
+            days.push(null);
+        }
+
+        for (let day = 1; day <= lastDay.getDate(); day++) {
+            days.push(new global.Date(year, month, day));
+        }
+
+        return days;
+    }, [calendarMonth]);
+
+    const isSameDay = (a, b) => {
+        return (
+            a &&
+            b &&
+            a.getDate() === b.getDate() &&
+            a.getMonth() === b.getMonth() &&
+            a.getFullYear() === b.getFullYear()
+        );
+    };
+
+    return (
+        <Modal visible={visible} transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalHeader}>
+                    <TouchableOpacity onPress={onClose}>
+                        <Ionicons name="arrow-back" size={28} color={colors.bluePrimary} />
+                    </TouchableOpacity>
+
+                    <Text style={styles.modalTitle}>History</Text>
+
+                    <TouchableOpacity>
+                        <Ionicons name="ellipsis-horizontal" size={28} color={colors.bluePrimary} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.calendarCard}>
+                    <View style={styles.calendarHeader}>
+                        <TouchableOpacity onPress={() => changeMonth(-1)}>
+                            <MaterialCommunityIcons name="chevron-left" size={32} color={colors.bluePrimary} />
+                        </TouchableOpacity>
+
+                        <Text style={styles.calendarMonth}>
+                            {monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+                        </Text>
+
+                        <TouchableOpacity onPress={() => changeMonth(1)}>
+                            <MaterialCommunityIcons name="chevron-right" size={32} color={colors.bluePrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.weekRow}>
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                            <Text key={day} style={styles.weekDay}>{day}</Text>
+                        ))}
+                    </View>
+
+                    <View style={styles.calendarGrid}>
+                        {calendarDays.map((date, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                disabled={!date}
+                                style={[
+                                    styles.calendarDay,
+                                    date && isSameDay(date, today) && styles.todayCircle,
+                                    date && isSameDay(date, selectedDate) && styles.selectedCircle,
+                                ]}
+                                onPress={() => {
+                                    setSelectedDate(date);
+                                    onClose();
+                                }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.calendarDayText,
+                                        date && isSameDay(date, selectedDate) && styles.selectedDayText,
+                                    ]}
+                                >
+                                    {date ? date.getDate() : ''}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </View>
+        </Modal>
     );
 }
 
@@ -184,7 +312,7 @@ function RingsMetrics() {
                             key={index}
                             size={m.ringSize}
                             width={24}
-                            fill={m.value / m.goal * 100}
+                            fill={(m.value / m.goal) * 100}
                             tintColor={m.color}
                             backgroundColor={colors.blueSecondary}
                             rotation={0}
@@ -199,10 +327,11 @@ function RingsMetrics() {
                         <View key={index} style={styles.metric}>
                             {m.icon}
                             <Text style={styles.metricLabel}>{m.label}</Text>
-                            <Text style={[styles.metricValue, {color: colors.bluePrimary}]}>
+                            <Text style={[styles.metricValue, { color: colors.bluePrimary }]}>
                                 {m.value}
-                                <Text
-                                    style={[styles.metricValue, {color: colors.blueTertiary}]}>/{m.goal} {m.unit}</Text>
+                                <Text style={[styles.metricValue, { color: colors.blueTertiary }]}>
+                                    /{m.goal} {m.unit}
+                                </Text>
                             </Text>
                         </View>
                     ))}
@@ -212,20 +341,20 @@ function RingsMetrics() {
     );
 }
 
-function XPSection({totalXp}) {
+function XPSection({ totalXp }) {
     const xpFillPercent = Math.max((totalXp / XP_GOAL) * 100, 7.5);
 
     return (
         <View style={styles.todayXpSection}>
             <View style={styles.iconContainer}>
-                <Ionicons name="rocket-outline" size={28} color={colors.bluePrimary}/>
+                <Ionicons name="rocket-outline" size={28} color={colors.bluePrimary} />
             </View>
 
             <View style={styles.todayXpContent}>
                 <Text style={styles.todayXpLabel}>Today's XP</Text>
                 <View style={styles.todayXpBarBackground}>
                     <View style={styles.todayXpBarInner}>
-                        <View style={[styles.todayXpBarFill, {width: `${xpFillPercent}%`}]}/>
+                        <View style={[styles.todayXpBarFill, { width: `${xpFillPercent}%` }]} />
                         <Text style={styles.todayXpTextOnBar}>{totalXp} / {XP_GOAL} xp</Text>
                     </View>
                 </View>
@@ -234,14 +363,14 @@ function XPSection({totalXp}) {
     );
 }
 
-function TodayTasks({tasks, setTasks}) {
+function TodayTasks({ tasks, setTasks }) {
     return (
-        <View style={[styles.sectionCard]}>
-            <View style={[styles.sectionHeader, {backgroundColor: colors.bluePrimary}]}>
-            </View>
+        <View style={styles.sectionCard}>
+            <View style={[styles.sectionHeader, { backgroundColor: colors.bluePrimary }]} />
             <View style={styles.headerContent}>
                 <Text style={styles.sectionHeaderText}>Tasks for today</Text>
             </View>
+
             <View style={styles.sectionContent}>
                 {tasks.map((task, i) => (
                     <TouchableOpacity
@@ -291,11 +420,12 @@ function CaloriesCounter() {
     };
 
     return (
-        <View style={[styles.sectionCard, {marginTop: 20, marginBottom: 20}]}>
-            <View style={[styles.sectionHeader, {backgroundColor: colors.orangePrimary}]}/>
+        <View style={[styles.sectionCard, { marginTop: 20, marginBottom: 20 }]}>
+            <View style={[styles.sectionHeader, { backgroundColor: colors.orangePrimary }]} />
             <View style={styles.headerContent}>
                 <Text style={styles.sectionHeaderText}>Calories counter</Text>
             </View>
+
             <View style={styles.sectionContent}>
                 {mealData.map((item, i) => {
                     const animatedHeight = animations[i].interpolate({
@@ -313,12 +443,15 @@ function CaloriesCounter() {
                                 onPress={() => toggleMeal(i)}
                             >
                                 <View style={styles.iconWrapper}>
-                                    <MaterialCommunityIcons name={item.icon} size={32} color={colors.orangePrimary}/>
+                                    <MaterialCommunityIcons name={item.icon} size={32} color={colors.orangePrimary} />
                                 </View>
+
                                 <Text style={styles.mealText}>{item.label}</Text>
+
                                 <Text style={styles.kcalText}>
                                     {item.dishes.reduce((sum, dish) => sum + dish.kcal, 0)} kcal
                                 </Text>
+
                                 <Ionicons
                                     name={isOpen ? 'chevron-up' : 'chevron-down'}
                                     size={24}
@@ -326,16 +459,17 @@ function CaloriesCounter() {
                                 />
                             </TouchableOpacity>
 
-                            <Animated.View style={[styles.expandedSectionContent, {height: animatedHeight}]}>
+                            <Animated.View style={[styles.expandedSectionContent, { height: animatedHeight }]}>
                                 {item.dishes.map((dish, j) => (
                                     <View
                                         key={j}
-                                        style={[styles.dishContainer, {borderTopWidth: j !== 0 ? 1 : 0}]}
+                                        style={[styles.dishContainer, { borderTopWidth: j !== 0 ? 1 : 0 }]}
                                     >
                                         <View style={styles.dishRow}>
                                             <Text style={styles.dishLabel}>{dish.name}</Text>
                                             <Text style={styles.dishLabel}>{dish.kcal} kcal</Text>
                                         </View>
+
                                         <Text style={styles.nutritionText}>
                                             <Text style={styles.nutritionLabel}>Protein:</Text> {dish.protein} gr{'   '}
                                             <Text style={styles.nutritionLabel}>Carbs:</Text> {dish.carbs} gr{'   '}
@@ -369,24 +503,98 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 16,
         fontFamily: 'Poppins_700Bold',
-        color: colors.bluePrimary
+        color: colors.bluePrimary,
     },
     dateRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 84,
+        gap: 60,
         marginBottom: 12,
     },
     dateBox: {
         backgroundColor: colors.bluePrimary,
         paddingVertical: 8,
-        paddingHorizontal: 24,
+        paddingHorizontal: 18,
         borderRadius: 14,
     },
     dateText: {
+        fontSize: 14,
+        fontFamily: 'Poppins_600SemiBold',
+        color: colors.background,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: colors.blueSecondary,
+        paddingHorizontal: 16,
+        paddingTop: 60,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 42,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontFamily: 'Poppins_700Bold',
+        color: colors.bluePrimary,
+    },
+    calendarCard: {
+        backgroundColor: colors.background,
+        borderRadius: 16,
+        padding: 16,
+        ...shadow,
+    },
+    calendarHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    calendarMonth: {
         fontSize: 16,
         fontFamily: 'Poppins_600SemiBold',
+        color: colors.bluePrimary,
+    },
+    weekRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    weekDay: {
+        width: 38,
+        textAlign: 'center',
+        fontSize: 12,
+        fontFamily: 'Poppins_600SemiBold',
+        color: colors.bluePrimary,
+    },
+    calendarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    calendarDay: {
+        width: '14.28%',
+        height: 42,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginVertical: 2,
+    },
+    calendarDayText: {
+        fontSize: 13,
+        fontFamily: 'Poppins_600SemiBold',
+        color: colors.bluePrimary,
+    },
+    todayCircle: {
+        borderWidth: 2,
+        borderColor: colors.orangePrimary,
+        borderRadius: 20,
+    },
+    selectedCircle: {
+        backgroundColor: colors.bluePrimary,
+        borderRadius: 20,
+    },
+    selectedDayText: {
         color: colors.background,
     },
     wrapper: {
@@ -469,7 +677,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 3,
         paddingVertical: 3,
-        justifyContent: 'center'
+        justifyContent: 'center',
     },
     todayXpBarFill: {
         backgroundColor: colors.orangePrimary,
