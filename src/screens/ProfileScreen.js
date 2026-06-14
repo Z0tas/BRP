@@ -78,8 +78,14 @@ export default function ProfileScreen({ navigation }) {
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <View style={styles.headerSide}>
-                        <TouchableOpacity onPress={() => navigation.navigate("  Home  ")}>
-                            <Ionicons name="arrow-back" size={24} color={colors.bluePrimary} />
+                        <TouchableOpacity
+                            onPress={() => navigation.getParent()?.replace('Login')}
+                        >
+                            <Ionicons
+                                name="arrow-back"
+                                size={24}
+                                color={colors.bluePrimary}
+                            />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => { /* scan action */ }} style={styles.iconSpacing}>
                             <Ionicons name="qr-code-outline" size={24} color={colors.bluePrimary} />
