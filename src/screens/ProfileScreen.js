@@ -549,9 +549,10 @@ const styles = StyleSheet.create({
         marginLeft: 16,
     },
     levelLabel: {
+        width: '100%',
+        textAlign: 'left',
         fontSize: 16,
         fontFamily: 'Poppins_600SemiBold',
-        left: 10,
         color: colors.bluePrimary,
         marginBottom: 4,
     },
