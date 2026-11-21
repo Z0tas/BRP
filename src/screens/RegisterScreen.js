@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
+    Alert,
     TextInput,
+    ScrollView,
     TouchableOpacity,
     StyleSheet,
 } from 'react-native';
@@ -23,6 +25,53 @@ export default function RegisterScreen({ navigation }) {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [accepted, setAccepted] = useState(false);
 
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmation, setConfirmation] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    async function handleRegister() {
+        if (busy) return;
+
+        if (password !== confirmation) {
+            Alert.alert('Registrierung', 'Die Passwörter stimmen nicht überein.');
+            return;
+        }
+
+        if (!accepted) {
+            Alert.alert('Registrierung', 'Bitte bestätige die Bedingungen.');
+            return;
+        }
+
+        setBusy(true);
+        try {
+            const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.0.18:3000';
+            const response = await fetch(`${baseUrl}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fullName, email, password }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                Alert.alert('Registrierung', result.message || 'Registrierung fehlgeschlagen.');
+                return;
+            }
+
+            Alert.alert('Konto erstellt', `Registriert als ${result.user.email}`, [
+                { text: 'Zum Login', onPress: () => navigation.navigate('Login') },
+            ]);
+        } catch {
+            Alert.alert(
+                'Verbindungsfehler',
+                'Die App hat keine gültige Antwort vom Backend erhalten. Prüfe, ob der Server läuft und das iPhone die Backend-Adresse erreichen kann.'
+            );
+        } finally {
+            setBusy(false);
+        }
+    }
+
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
         Poppins_500Medium,
@@ -33,7 +82,13 @@ export default function RegisterScreen({ navigation }) {
     if (!fontsLoaded) return null;
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+        >
             <View style={styles.logoCircle}>
                 <View style={styles.ringBlue} />
                 <View style={styles.ringCyan} />
@@ -51,6 +106,8 @@ export default function RegisterScreen({ navigation }) {
                         style={styles.input}
                         placeholder="Enter your full name"
                         placeholderTextColor={colors.blueTertiary}
+                        value={fullName}
+                        onChangeText={setFullName}
                     />
                 </View>
 
@@ -63,6 +120,8 @@ export default function RegisterScreen({ navigation }) {
                         placeholderTextColor={colors.blueTertiary}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        value={email}
+                        onChangeText={setEmail}
                     />
                 </View>
 
@@ -74,6 +133,8 @@ export default function RegisterScreen({ navigation }) {
                         placeholder="Create your password"
                         placeholderTextColor={colors.blueTertiary}
                         secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
                     />
                     <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                         <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={25} color="#555" />
@@ -88,6 +149,8 @@ export default function RegisterScreen({ navigation }) {
                         placeholder="Confirm your password"
                         placeholderTextColor={colors.blueTertiary}
                         secureTextEntry={!showConfirmPassword}
+                        value={confirmation}
+                        onChangeText={setConfirmation}
                     />
                     <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
                         <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={25} color="#555" />
@@ -104,8 +167,14 @@ export default function RegisterScreen({ navigation }) {
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.mainButton}>
-                    <Text style={styles.mainButtonText}>Create Account</Text>
+                <TouchableOpacity
+                    style={styles.mainButton}
+                    onPress={handleRegister}
+                    disabled={busy}
+                >
+                    <Text style={styles.mainButtonText}>
+                        {busy ? 'Creating account…' : 'Create Account'}
+                    </Text>
                 </TouchableOpacity>
 
                 <View style={styles.bottomRow}>
@@ -115,7 +184,7 @@ export default function RegisterScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </ScrollView>
     );
 }
 
@@ -123,8 +192,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-        paddingHorizontal: 32,
+    },
+    content: {
+        flexGrow: 1,
         justifyContent: 'center',
+        paddingHorizontal: 32,
+        paddingVertical: 24,
     },
     logoCircle: {
         width: 170,

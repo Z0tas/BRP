@@ -3,7 +3,9 @@ import AntDesign from 'react-native-vector-icons/AntDesign';
 import {
     View,
     Text,
+    Alert,
     TextInput,
+    ScrollView,
     TouchableOpacity,
     StyleSheet,
     Image,
@@ -22,6 +24,40 @@ import { shadow } from '../theme/shadow';
 
 export default function LoginScreen({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    async function handleLogin() {
+        if (busy) return;
+
+        if (!email.trim() || !password) {
+            Alert.alert('Login', 'Bitte E-Mail und Passwort eingeben.');
+            return;
+        }
+
+        setBusy(true);
+        try {
+            const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.0.18:3000';
+            const response = await fetch(`${baseUrl}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email.trim(), password }),
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                Alert.alert('Login', result.message || 'Anmeldung fehlgeschlagen.');
+                return;
+            }
+
+            navigation.replace('MainApp');
+        } catch {
+            Alert.alert('Login', 'Keine gültige Antwort vom Backend erhalten.');
+        } finally {
+            setBusy(false);
+        }
+    }
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -33,7 +69,13 @@ export default function LoginScreen({ navigation }) {
     if (!fontsLoaded) return null;
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+        >
             <View style={styles.logoCircle}>
                 <View style={styles.ringBlue} />
                 <View style={styles.ringCyan} />
@@ -53,6 +95,8 @@ export default function LoginScreen({ navigation }) {
                         placeholderTextColor={colors.blueTertiary}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        value={email}
+                        onChangeText={setEmail}
                     />
                 </View>
 
@@ -64,6 +108,8 @@ export default function LoginScreen({ navigation }) {
                         placeholder="Enter your password"
                         placeholderTextColor={colors.blueTertiary}
                         secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
                     />
                     <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                         <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={25} color="#555" />
@@ -74,6 +120,15 @@ export default function LoginScreen({ navigation }) {
                     <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                    style={styles.skipButton}
+                    onPress={handleLogin}
+                    disabled={busy}
+                >
+                    <Text style={styles.skipButtonText}>
+                        {busy ? 'Logging in…' : 'Log In'}
+                    </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.skipButton}
                     onPress={() => navigation.replace('MainApp')}
@@ -99,7 +154,7 @@ export default function LoginScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </ScrollView>
     );
 }
 
@@ -107,8 +162,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-        paddingHorizontal: 32,
+    },
+    content: {
+        flexGrow: 1,
         justifyContent: 'center',
+        paddingHorizontal: 32,
+        paddingVertical: 24,
     },
     logoCircle: {
         width: 170,
