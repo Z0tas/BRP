@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useFitness, dayKey, sumEntries } from '../context/FitnessContext';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal } from 'react-native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -13,10 +14,10 @@ import {
     Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 
-const metrics = [
+const metricTemplates = [
     {
         label: 'Distance',
-        value: 4.3,
+        value: 0,
         goal: 7,
         unit: 'km',
         icon: <MaterialIcons name="route" size={24} color={colors.bluePrimary} />,
@@ -25,7 +26,7 @@ const metrics = [
     },
     {
         label: 'Calories',
-        value: 1800,
+        value: 0,
         goal: 2000,
         unit: 'kcal',
         icon: <Ionicons name="flame-outline" size={24} color={colors.orangePrimary} />,
@@ -34,7 +35,7 @@ const metrics = [
     },
     {
         label: 'Hydration',
-        value: 1.9,
+        value: 0,
         goal: 2,
         unit: 'l',
         icon: <Ionicons name="water-outline" size={24} color={colors.cyanPrimary} />,
@@ -92,9 +93,36 @@ const mealData = [
 ];
 
 export default function HomeScreen() {
-    const [tasks, setTasks] = useState(initialTasks);
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new global.Date());
+    const { entries, record, ready, error, retry } = useFitness();
+    const selectedDay = dayKey(selectedDate);
+    const todayEntries = entries.filter(item => item.day === selectedDay);
+
+    const values = {
+        Distance: sumEntries(todayEntries, 'distance') / 1000,
+        Calories: sumEntries(todayEntries, 'meal'),
+        Hydration: sumEntries(todayEntries, 'water') / 1000,
+    };
+
+    const metrics = metricTemplates.map(item => ({
+        ...item,
+        value: values[item.label],
+    }));
+
+    const tasks = initialTasks.map(task => ({
+        ...task,
+        completed: todayEntries.some(item => item.kind === 'task' && item.label === task.label),
+    }));
+
+    function toggleTask(task) {
+        record({
+            day: selectedDay,
+            kind: 'task',
+            label: task.label,
+            completed: !task.completed,
+        });
+    }
 
     const totalXp = tasks.reduce(
         (acc, task) => acc + (task.completed ? task.xp : 0),
@@ -111,6 +139,18 @@ export default function HomeScreen() {
     if (!fontsLoaded) {
         return null;
     }
+    if (!ready) {
+        return (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text>{error || 'Fitnessdaten werden geladen …'}</Text>
+                {!!error && (
+                    <TouchableOpacity onPress={retry}>
+                        <Text>Erneut laden</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        );
+    }
 
     return (
         <>
@@ -122,10 +162,18 @@ export default function HomeScreen() {
                     setSelectedDate={setSelectedDate}
                 />
 
-                <RingsMetrics />
+                <RingsMetrics metrics={metrics} />
                 <XPSection totalXp={totalXp} />
-                <TodayTasks tasks={tasks} setTasks={setTasks} />
-                <CaloriesCounter />
+                <TodayTasks tasks={tasks} toggleTask={toggleTask} />
+                <CaloriesCounter
+                    meals={todayEntries.filter(item => item.kind === 'meal')}
+                    onAdd={dish => record({
+                        day: selectedDay,
+                        kind: 'meal',
+                        label: dish.name,
+                        amount: dish.kcal,
+                    })}
+                />
             </ScrollView>
 
             <CalendarModal
@@ -302,7 +350,7 @@ function CalendarModal({ visible, selectedDate, setSelectedDate, onClose }) {
     );
 }
 
-function RingsMetrics() {
+function RingsMetrics({ metrics }) {
     return (
         <View style={styles.wrapper}>
             <View style={styles.centerBlock}>
@@ -312,7 +360,7 @@ function RingsMetrics() {
                             key={index}
                             size={m.ringSize}
                             width={24}
-                            fill={(m.value / m.goal) * 100}
+                            fill={Math.min(100, (m.value / m.goal) * 100)}
                             tintColor={m.color}
                             backgroundColor={colors.blueSecondary}
                             rotation={0}
@@ -342,7 +390,7 @@ function RingsMetrics() {
 }
 
 function XPSection({ totalXp }) {
-    const xpFillPercent = Math.max((totalXp / XP_GOAL) * 100, 7.5);
+    const xpFillPercent = Math.min(100, (totalXp / XP_GOAL) * 100);
 
     return (
         <View style={styles.todayXpSection}>
@@ -363,7 +411,7 @@ function XPSection({ totalXp }) {
     );
 }
 
-function TodayTasks({ tasks, setTasks }) {
+function TodayTasks({ tasks, toggleTask }) {
     return (
         <View style={styles.sectionCard}>
             <View style={[styles.sectionHeader, { backgroundColor: colors.bluePrimary }]} />
@@ -375,11 +423,7 @@ function TodayTasks({ tasks, setTasks }) {
                 {tasks.map((task, i) => (
                     <TouchableOpacity
                         key={i}
-                        onPress={() => {
-                            const updated = [...tasks];
-                            updated[i].completed = !updated[i].completed;
-                            setTasks(updated);
-                        }}
+                        onPress={() => toggleTask(task)}
                         style={styles.sectionRow}
                     >
                         <Ionicons
@@ -396,91 +440,72 @@ function TodayTasks({ tasks, setTasks }) {
     );
 }
 
-function CaloriesCounter() {
-    const [expandedMeals, setExpandedMeals] = useState(new Set());
-    const [animations] = useState(mealData.map(() => new Animated.Value(0)));
-
-    const toggleMeal = (index) => {
-        const isExpanded = expandedMeals.has(index);
-        const newSet = new Set(expandedMeals);
-
-        Animated.timing(animations[index], {
-            toValue: isExpanded ? 0 : 1,
-            duration: 300,
-            useNativeDriver: false,
-        }).start();
-
-        if (isExpanded) {
-            newSet.delete(index);
-        } else {
-            newSet.add(index);
-        }
-
-        setExpandedMeals(newSet);
-    };
+function CaloriesCounter({ meals, onAdd }) {
+    const [openGroup, setOpenGroup] = useState(null);
+    const total = meals.reduce((sum, meal) => sum + meal.amount, 0);
 
     return (
         <View style={[styles.sectionCard, { marginTop: 20, marginBottom: 20 }]}>
             <View style={[styles.sectionHeader, { backgroundColor: colors.orangePrimary }]} />
+
             <View style={styles.headerContent}>
-                <Text style={styles.sectionHeaderText}>Calories counter</Text>
+                <Text style={styles.sectionHeaderText}>Mahlzeiten · {total} kcal</Text>
             </View>
 
             <View style={styles.sectionContent}>
-                {mealData.map((item, i) => {
-                    const animatedHeight = animations[i].interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, item.dishes.length * 55],
-                        extrapolate: 'clamp',
-                    });
+                {mealData.map(group => (
+                    <View key={group.label}>
+                        <TouchableOpacity
+                            style={styles.sectionRow}
+                            onPress={() => setOpenGroup(
+                                openGroup === group.label ? null : group.label
+                            )}
+                        >
+                            <MaterialCommunityIcons
+                                name={group.icon}
+                                size={28}
+                                color={colors.orangePrimary}
+                            />
+                            <Text style={styles.mealText}>{group.label}</Text>
+                            <Ionicons
+                                name={openGroup === group.label ? 'chevron-up' : 'chevron-down'}
+                                size={22}
+                                color={colors.bluePrimary}
+                            />
+                        </TouchableOpacity>
 
-                    const isOpen = expandedMeals.has(i);
-
-                    return (
-                        <View key={i}>
+                        {openGroup === group.label && group.dishes.map(dish => (
                             <TouchableOpacity
-                                style={styles.sectionRow}
-                                onPress={() => toggleMeal(i)}
+                                key={dish.name}
+                                style={styles.dishContainer}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${dish.name} als gegessen eintragen`}
+                                onPress={() => onAdd(dish)}
                             >
-                                <View style={styles.iconWrapper}>
-                                    <MaterialCommunityIcons name={item.icon} size={32} color={colors.orangePrimary} />
+                                <View style={styles.dishRow}>
+                                    <Text style={styles.dishLabel}>+ {dish.name}</Text>
+                                    <Text style={styles.dishLabel}>{dish.kcal} kcal</Text>
                                 </View>
-
-                                <Text style={styles.mealText}>{item.label}</Text>
-
-                                <Text style={styles.kcalText}>
-                                    {item.dishes.reduce((sum, dish) => sum + dish.kcal, 0)} kcal
+                                <Text style={styles.nutritionText}>
+                                    Protein: {dish.protein} g · Carbs: {dish.carbs} g · Fat: {dish.fat} g
                                 </Text>
-
-                                <Ionicons
-                                    name={isOpen ? 'chevron-up' : 'chevron-down'}
-                                    size={24}
-                                    color={colors.orangePrimary}
-                                />
                             </TouchableOpacity>
+                        ))}
+                    </View>
+                ))}
 
-                            <Animated.View style={[styles.expandedSectionContent, { height: animatedHeight }]}>
-                                {item.dishes.map((dish, j) => (
-                                    <View
-                                        key={j}
-                                        style={[styles.dishContainer, { borderTopWidth: j !== 0 ? 1 : 0 }]}
-                                    >
-                                        <View style={styles.dishRow}>
-                                            <Text style={styles.dishLabel}>{dish.name}</Text>
-                                            <Text style={styles.dishLabel}>{dish.kcal} kcal</Text>
-                                        </View>
+                <Text style={styles.dishLabel}>Am ausgewählten Tag gegessen</Text>
 
-                                        <Text style={styles.nutritionText}>
-                                            <Text style={styles.nutritionLabel}>Protein:</Text> {dish.protein} gr{'   '}
-                                            <Text style={styles.nutritionLabel}>Carbs:</Text> {dish.carbs} gr{'   '}
-                                            <Text style={styles.nutritionLabel}>Fat:</Text> {dish.fat} gr
-                                        </Text>
-                                    </View>
-                                ))}
-                            </Animated.View>
+                {meals.length === 0 ? (
+                    <Text style={styles.nutritionText}>Noch keine Mahlzeit eingetragen.</Text>
+                ) : (
+                    meals.map(meal => (
+                        <View key={meal.id} style={styles.dishRow}>
+                            <Text style={styles.dishLabel}>{meal.label}</Text>
+                            <Text style={styles.dishLabel}>{meal.amount} kcal</Text>
                         </View>
-                    );
-                })}
+                    ))
+                )}
             </View>
         </View>
     );

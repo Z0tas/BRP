@@ -3,6 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, LayoutAnimation } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFavorites } from '../context/FavoritesContext';
+import { useFitness, dayKey, sumEntries } from '../context/FitnessContext';
+import { Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { API_URL, useAuth } from '../context/AuthContext';
 import {
     useFonts,
     Poppins_400Regular,
@@ -13,13 +17,7 @@ import {
 import { colors } from '../theme/colors';
 import { shadow } from '../theme/shadow';
 
-// Dummy data for charts and lists
-const chartData = {
-    Distance: [2.5, 3.2, 1.8, 4.0, 5.5, 4.2, 3.0],
-    Calories: [300, 450, 800, 650, 1000, 750, 900],
-    Hydration: [1200, 1800, 1100, 2000, 1700, 2500, 1900]
-};
-const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
 
 const categoryUnits = {
     Distance: 'km',
@@ -42,6 +40,104 @@ const CATEGORY_COLORS = {
 
 
 export default function ProfileScreen({ navigation }) {
+    const { session, setSession, updateAvatar } = useAuth();
+    const [savingPhoto, setSavingPhoto] = useState(false);
+    const user = session.user;
+    const { entries, ready, error, retry } = useFitness();
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+
+    const week = Array.from({ length: 7 }, (_, offset) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + offset);
+        return entries.filter(item => item.day === dayKey(date));
+    });
+
+    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const chartData = {
+        Distance: week.map(rows => sumEntries(rows, 'distance') / 1000),
+        Calories: week.map(rows => sumEntries(rows, 'meal')),
+        Hydration: week.map(rows => sumEntries(rows, 'water')),
+    };
+
+    const totalXp = sumEntries(entries, 'task');
+    const level = Math.floor(totalXp / 1200);
+    const levelXp = totalXp % 1200;
+
+    let age = null;
+    if (user.birthDate) {
+        const [year, month, day] = user.birthDate.split('-').map(Number);
+        age = now.getFullYear() - year;
+        if (now.getMonth() + 1 < month ||
+            (now.getMonth() + 1 === month && now.getDate() < day)) {
+            age -= 1;
+        }
+    }
+
+    async function choosePhoto() {
+        if (savingPhoto) return;
+        setSavingPhoto(true);
+
+        try {
+            const picked = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 0.65,
+                base64: true,
+            });
+
+            if (picked.canceled) return;
+
+            const image = picked.assets[0]?.base64;
+            if (!image || image.length > 12 * 1024 * 1024) {
+                Alert.alert('Profilfoto', 'Bitte ein kleineres Foto auswählen.');
+                return;
+            }
+
+            const response = await fetch(`${API_URL}/me/avatar`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${session.token}`,
+                    'Content-Type': 'text/plain',
+                },
+                body: image,
+            });
+
+            if (response.status === 401) {
+                Alert.alert('Sitzung abgelaufen', 'Bitte melde dich erneut an.');
+                setSession(null);
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error('Das Foto konnte nicht gespeichert werden.');
+            }
+
+            const result = await response.json();
+            updateAvatar(result.avatar);
+        } catch (error) {
+            Alert.alert('Profilfoto', error.message);
+        } finally {
+            setSavingPhoto(false);
+        }
+    }
+
+    async function logout() {
+        try {
+            const response = await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session.token}` },
+            });
+
+            if (!response.ok && response.status !== 401) {
+                throw new Error('Abmeldung fehlgeschlagen.');
+            }
+            setSession(null);
+        } catch (error) {
+            Alert.alert('Abmelden', error.message);
+        }
+    }
     const [selectedCategory, setSelectedCategory] = useState('Calories');
     const [showAllRecipes, setShowAllRecipes] = useState(false);
     const {
@@ -79,7 +175,8 @@ export default function ProfileScreen({ navigation }) {
                 <View style={styles.headerRow}>
                     <View style={styles.headerSide}>
                         <TouchableOpacity
-                            onPress={() => navigation.getParent()?.replace('Login')}
+                            onPress={logout}
+                            accessibilityLabel="Abmelden"
                         >
                             <Ionicons
                                 name="arrow-back"
@@ -105,42 +202,62 @@ export default function ProfileScreen({ navigation }) {
 
                 {/* Profile Info */}
                 <View style={styles.profileSection}>
-                    <Image
-                        style={styles.profileImage}
-                        source={require('../../assets/HubsImages/student_avatar.jpg')}
-                    />
-                    <View style={styles.profileInfo}>
-                        <Text style={styles.profileName}>Nina Keller</Text>
-                        <View style={styles.profileDetailRow}>
-                            <Ionicons name="mail-outline" size={16} color={colors.bluePrimary}
-                                style={styles.profileDetailIcon} />
-                            <Text style={styles.profileDetailText}>Nina.Keller@gmail.com</Text>
-                        </View>
-                        <View style={styles.profileDetailRow}>
-                            <Ionicons name="school-outline" size={16} color={colors.bluePrimary}
-                                style={styles.profileDetailIcon} />
-                            <Text style={styles.profileDetailText}>TU</Text>
-                        </View>
-                        <View style={styles.profileDetailRow}>
-                            <Ionicons name="calendar-outline" size={16} color={colors.bluePrimary}
-                                style={styles.profileDetailIcon} />
-                            <Text style={styles.profileDetailText}>22 years</Text>
-                        </View>
+                    <TouchableOpacity
+                        onPress={choosePhoto}
+                        disabled={savingPhoto}
+                        accessibilityRole="button"
+                        accessibilityLabel="Profilfoto aus der Galerie auswählen"
+                        style={{ alignItems: 'center' }}
+                    >
+                        {user.avatar ? (
+                            <Image source={{ uri: user.avatar }} style={styles.profileImage} />
+                        ) : (
+                            <View
+                                style={[
+                                    styles.profileImage,
+                                    {
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: colors.blueSecondary,
+                                    },
+                                ]}
+                            >
+                                <Ionicons name="person-outline" size={36} color={colors.bluePrimary} />
+                            </View>
+                        )}
+
+                        <Text style={{ color: colors.bluePrimary }}>
+                            {savingPhoto ? 'Speichert …' : user.avatar ? 'Foto ändern' : 'Foto wählen'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.profileInfo, { flex: 1 }]}>
+                        <Text style={styles.profileName}>{user.fullName || user.email}</Text>
+                        <Text style={styles.profileDetailText}>{user.email}</Text>
+                        {age !== null && <Text style={styles.profileDetailText}>{age} Jahre</Text>}
+                        {!!user.university && (
+                            <Text style={styles.profileDetailText}>{user.university}</Text>
+                        )}
                     </View>
                 </View>
 
                 {/* XP Progress Bar */}
                 <View style={styles.xpSection}>
                     <View style={styles.levelContainer}>
-                        <Text style={styles.levelNumber}>2</Text>
+                        <Text style={styles.levelNumber}>{level}</Text>
                     </View>
+                    {!ready && (
+                        <TouchableOpacity disabled={!error} onPress={retry}>
+                            <Text>{error ? `${error} · Erneut laden` : 'Fitnessdaten werden geladen …'}</Text>
+                        </TouchableOpacity>
+                    )}
                     <View style={styles.xpContainer}>
                         <Text style={styles.levelLabel}>Level</Text>
                         <View style={styles.xpBarContainer}>
                             <View style={styles.xpBarBackground}>
                                 <View style={styles.xpBarInner}>
-                                    <View style={[styles.xpBarFill, { width: `${(500 / 1200) * 100}%` }]} />
-                                    <Text style={styles.xpTextOnBar}>500 / 1200 xp</Text>
+                                    <View style={[styles.xpBarFill, { width: `${(levelXp / 1200) * 100}%` }]} />
+                                    <Text style={styles.xpTextOnBar}>{levelXp} / 1200 xp</Text>
                                 </View>
                             </View>
                         </View>
@@ -180,7 +297,7 @@ export default function ProfileScreen({ navigation }) {
                         <View style={styles.chartContainer}>
                             <View style={[styles.barChart, { height: chartHeight }]}>
                                 {currentData.map((value, index) => {
-                                    const barHeight = (value / maxChartValue) * chartHeight;
+                                    const barHeight = maxChartValue > 0 ? (value / maxChartValue) * chartHeight : 0;
                                     return (
                                         <View key={index} style={styles.barContainer}>
                                             <View style={[styles.bar, {

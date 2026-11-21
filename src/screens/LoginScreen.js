@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import {
     View,
@@ -23,6 +24,7 @@ import { colors } from '../theme/colors';
 import { shadow } from '../theme/shadow';
 
 export default function LoginScreen({ navigation }) {
+    const { setSession } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -51,7 +53,7 @@ export default function LoginScreen({ navigation }) {
                 return;
             }
 
-            navigation.replace('MainApp');
+            setSession({ token: result.token, user: result.user });
         } catch {
             Alert.alert('Login', 'Keine gültige Antwort vom Backend erhalten.');
         } finally {

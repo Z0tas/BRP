@@ -27,6 +27,8 @@ export default function RegisterScreen({ navigation }) {
 
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
+    const [birthDate, setBirthDate] = useState('');
+    const [university, setUniversity] = useState('');
     const [password, setPassword] = useState('');
     const [confirmation, setConfirmation] = useState('');
     const [busy, setBusy] = useState(false);
@@ -50,7 +52,11 @@ export default function RegisterScreen({ navigation }) {
             const response = await fetch(`${baseUrl}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fullName, email, password }),
+                body: JSON.stringify({
+                    fullName, email, password,
+                    birthDate: birthDate.trim(),
+                    university: university.trim(),
+                }),
             });
 
             const result = await response.json();
@@ -110,7 +116,27 @@ export default function RegisterScreen({ navigation }) {
                         onChangeText={setFullName}
                     />
                 </View>
+                <Text style={styles.label}>Geburtsdatum (optional)</Text>
+                <View style={styles.inputBox}>
+                    <TextInput
+                        style={styles.input}
+                        value={birthDate}
+                        onChangeText={setBirthDate}
+                        placeholder="JJJJ-MM-TT"
+                        maxLength={10}
+                    />
+                </View>
 
+                <Text style={styles.label}>Hochschule (optional)</Text>
+                <View style={styles.inputBox}>
+                    <TextInput
+                        style={styles.input}
+                        value={university}
+                        onChangeText={setUniversity}
+                        placeholder="z. B. TU Wien"
+                        maxLength={160}
+                    />
+                </View>
                 <Text style={styles.label}>Email</Text>
                 <View style={styles.inputBox}>
                     <MaterialCommunityIcons name="email-outline" size={24} color={colors.cyanPrimary} />

@@ -1,13 +1,14 @@
-import React, {useState} from 'react';
-import {Modal, View, Text, TouchableOpacity, StyleSheet, SafeAreaView} from 'react-native';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import React, { useState } from 'react';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import HomeScreen from '../screens/HomeScreen';
 import HubsScreen from '../screens/HubsScreen';
 import IdeasScreen from '../screens/IdeasScreen';
+import { useFitness } from '../context/FitnessContext';
 import ProfileScreen from '../screens/ProfileScreen';
-import {colors} from '../theme/colors';
-import {shadow} from '../theme/shadow';
+import { colors } from '../theme/colors';
+import { shadow } from '../theme/shadow';
 import {
     useFonts,
     Poppins_100Thin,
@@ -32,10 +33,10 @@ import {
 
 const Tab = createBottomTabNavigator();
 
-function PlusButton({onPress}) {
+function PlusButton({ onPress }) {
     return (
         <TouchableOpacity style={styles.plusButton} onPress={onPress}>
-            <Ionicons name="add" size={48} color={colors.background}/>
+            <Ionicons name="add" size={48} color={colors.background} />
         </TouchableOpacity>
     );
 }
@@ -66,18 +67,18 @@ export default function TabNavigation() {
 
     return (
         <>
-            <NavigationTab setModalVisible={setModalVisible}/>
-            <PopupMenu modalVisible={modalVisible} setModalVisible={setModalVisible}/>
+            <NavigationTab setModalVisible={setModalVisible} />
+            <PopupMenu modalVisible={modalVisible} setModalVisible={setModalVisible} />
         </>
     );
 }
 
-function NavigationTab({setModalVisible}) {
+function NavigationTab({ setModalVisible }) {
     const openPopup = () => setModalVisible(true);
 
     return (
         <Tab.Navigator
-            screenOptions={({route}) => ({
+            screenOptions={({ route }) => ({
                 tabBarShowLabel: true,
                 tabBarStyle: styles.tabBar,
                 tabBarLabelStyle: styles.tabBarLabel,
@@ -85,39 +86,79 @@ function NavigationTab({setModalVisible}) {
                 tabBarActiveTintColor: colors.bluePrimary,
                 tabBarInactiveTintColor: colors.blueTertiary,
                 headerShown: false,
-                tabBarIcon: ({focused, color, size}) => {
+                tabBarIcon: ({ focused, color, size }) => {
                     switch (route.name) {
                         case '  Home  ':
-                            return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color}/>;
+                            return <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />;
                         case '  Hubs  ':
-                            return <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color}/>;
+                            return <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />;
                         case '  Ideas  ':
                             return <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={size}
-                                             color={color}/>;
+                                color={color} />;
                         case '  Profile  ':
-                            return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color}/>;
+                            return <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />;
                         default:
                             return null;
                     }
                 },
             })}
             id="0">
-            <Tab.Screen name="  Home  " component={HomeScreen}/>
-            <Tab.Screen name="  Hubs  " component={HubsScreen}/>
+            <Tab.Screen name="  Home  " component={HomeScreen} />
+            <Tab.Screen name="  Hubs  " component={HubsScreen} />
             <Tab.Screen
                 name="Create"
                 component={HomeScreen}
                 options={{
-                    tabBarButton: () => <PlusButton onPress={openPopup}/>,
+                    tabBarButton: () => <PlusButton onPress={openPopup} />,
                 }}
             />
-            <Tab.Screen name="  Ideas  " component={IdeasScreen}/>
-            <Tab.Screen name="  Profile  " component={ProfileScreen}/>
+            <Tab.Screen name="  Ideas  " component={IdeasScreen} />
+            <Tab.Screen name="  Profile  " component={ProfileScreen} />
         </Tab.Navigator>
     );
 }
 
-function PopupMenu({modalVisible, setModalVisible}) {
+function PopupMenu({ modalVisible, setModalVisible }) {
+    const { record, ready } = useFitness();
+
+    function addWater() {
+        closePopup();
+        record({ kind: 'water', label: 'Wasser', amount: 250 });
+    }
+
+    function enterAmount(kind) {
+        closePopup();
+        const isMeal = kind === 'meal';
+
+        // Der Systemdialog erscheint, sobald das iOS-Menü geschlossen ist.
+        setTimeout(() => {
+            Alert.prompt(
+                isMeal ? 'Mahlzeit eintragen' : 'Strecke eintragen',
+                isMeal ? 'Wie viele kcal?' : 'Wie viele Meter?',
+                [
+                    { text: 'Abbrechen', style: 'cancel' },
+                    {
+                        text: 'Speichern',
+                        onPress: text => {
+                            const value = Number((text || '').trim());
+                            if (!Number.isInteger(value) || value <= 0 || value > 1000000) {
+                                Alert.alert('Bitte eine positive ganze Zahl eingeben.');
+                                return;
+                            }
+                            record({
+                                kind,
+                                label: isMeal ? 'Mahlzeit' : 'Aktivität',
+                                amount: value,
+                            });
+                        },
+                    },
+                ],
+                'plain-text',
+                '',
+                'number-pad'
+            );
+        }, 400);
+    }
     const closePopup = () => setModalVisible(false);
 
     return (
@@ -131,31 +172,54 @@ function PopupMenu({modalVisible, setModalVisible}) {
                 <View style={styles.styledModal}>
                     <View style={styles.modalHeader}>
                         <TouchableOpacity onPress={closePopup}>
-                            <Ionicons name="close" size={28} color={colors.bluePrimary}/>
+                            <Ionicons name="close" size={28} color={colors.bluePrimary} />
                         </TouchableOpacity>
                         <Text style={styles.modalTitle}>Records</Text>
-                        <View style={{width: 28}}/>
+                        <View style={{ width: 28 }} />
                     </View>
 
                     <View style={styles.modalContent}>
-                        <TouchableOpacity style={[styles.button, {backgroundColor: colors.blueSecondary}]}>
-                            <Ionicons name="walk-outline" size={20} color={colors.bluePrimary}/>
-                            <Text style={[styles.buttonText, {color: colors.bluePrimary}]}>Log activity</Text>
+                        <TouchableOpacity
+                            style={[styles.button, { backgroundColor: colors.blueSecondary }]}
+                            disabled={!ready}
+                            onPress={() => enterAmount('distance')}
+                        >
+                            <Ionicons name="walk-outline" size={20} color={colors.bluePrimary} />
+                            <Text style={[styles.buttonText, { color: colors.bluePrimary }]}>
+                                Log activity
+                            </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.button, {backgroundColor: colors.cyanSecondary}]}>
-                            <Ionicons name="water-outline" size={20} color={colors.cyanPrimary}/>
-                            <Text style={[styles.buttonText, {color: colors.cyanPrimary}]}>Water intake</Text>
+                        <TouchableOpacity
+                            style={[styles.button, { backgroundColor: colors.cyanSecondary }]}
+                            disabled={!ready}
+                            onPress={addWater}
+                        >
+                            <Ionicons name="water-outline" size={20} color={colors.cyanPrimary} />
+                            <Text style={[styles.buttonText, { color: colors.cyanPrimary }]}>
+                                + 250 ml Wasser
+                            </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.button, {backgroundColor: colors.orangeSecondary}]}>
-                            <Ionicons name="pencil-outline" size={20} color={colors.orangePrimary}/>
-                            <Text style={[styles.buttonText, {color: colors.orangePrimary}]}>Manual Meal Input</Text>
+                        <TouchableOpacity
+                            style={[styles.button, { backgroundColor: colors.orangeSecondary }]}
+                            disabled={!ready}
+                            onPress={() => enterAmount('meal')}
+                        >
+                            <Ionicons name="pencil-outline" size={20} color={colors.orangePrimary} />
+                            <Text style={[styles.buttonText, { color: colors.orangePrimary }]}>
+                                Manual Meal Input
+                            </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.button, {backgroundColor: colors.orangeSecondary}]}>
-                            <Ionicons name="scan-outline" size={20} color={colors.orangePrimary}/>
-                            <Text style={[styles.buttonText, {color: colors.orangePrimary}]}>AI Meal Scan</Text>
+                        <TouchableOpacity
+                            style={[styles.button, { backgroundColor: colors.orangeSecondary }]}
+                            disabled
+                        >
+                            <Ionicons name="scan-outline" size={20} color={colors.orangePrimary} />
+                            <Text style={[styles.buttonText, { color: colors.orangePrimary }]}>
+                                AI Meal Scan (bald verfügbar)
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
