@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { useFitness, dayKey, sumEntries } from '../context/FitnessContext';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal } from 'react-native';
+import { useFitness, useTodayKey, dayKey, sumEntries } from '../context/FitnessContext';
+import { Alert, View, Text, TouchableOpacity, StyleSheet, Animated, Modal } from 'react-native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import { TextInput } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { promptForAmount } from '../logAmount';
 import { colors } from '../theme/colors';
 import { shadow } from '../theme/shadow';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -94,9 +96,21 @@ const mealData = [
 
 export default function HomeScreen() {
     const [showCalendar, setShowCalendar] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(new global.Date());
+    const today = useTodayKey();
+    const [calendarDay, setCalendarDay] = useState(null);
     const { entries, record, ready, error, retry } = useFitness();
-    const selectedDay = dayKey(selectedDate);
+
+    const selectedDay = calendarDay || today;
+    const selectedDate = useMemo(() => {
+        const [year, month, day] = selectedDay.split('-').map(Number);
+        return new global.Date(year, month - 1, day, 12);
+    }, [selectedDay]);
+
+    function setSelectedDate(date) {
+        const key = dayKey(date);
+        setCalendarDay(key === today ? null : key);
+    }
+
     const todayEntries = entries.filter(item => item.day === selectedDay);
 
     const values = {
@@ -110,10 +124,38 @@ export default function HomeScreen() {
         value: values[item.label],
     }));
 
-    const tasks = initialTasks.map(task => ({
-        ...task,
-        completed: todayEntries.some(item => item.kind === 'task' && item.label === task.label),
-    }));
+    const customTasks = todayEntries
+        .filter(item => item.kind === 'custom_task')
+        .map(item => ({
+            label: item.label,
+            xp: item.amount,
+        }));
+
+    const hiddenTaskNames = new Set(
+        todayEntries
+            .filter(item => item.kind === 'hidden_task')
+            .map(item => item.label)
+    );
+
+    const tasks = [...initialTasks, ...customTasks]
+        .filter(task => !hiddenTaskNames.has(task.label))
+        .map(task => ({
+            ...task,
+            completed: todayEntries.some(
+                item => item.kind === 'task' && item.label === task.label
+            ),
+        }));
+
+    const dailyXpGoal = tasks.reduce((sum, task) => sum + task.xp, 0);
+
+    function addCustomTask(label, xp) {
+        return record({
+            day: selectedDay,
+            kind: 'custom_task',
+            label,
+            amount: xp,
+        });
+    }
 
     function toggleTask(task) {
         record({
@@ -124,10 +166,7 @@ export default function HomeScreen() {
         });
     }
 
-    const totalXp = tasks.reduce(
-        (acc, task) => acc + (task.completed ? task.xp : 0),
-        0
-    );
+    const totalXp = sumEntries(todayEntries, 'task');
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -142,10 +181,10 @@ export default function HomeScreen() {
     if (!ready) {
         return (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text>{error || 'Fitnessdaten werden geladen …'}</Text>
+                <Text>{error || 'Loading fitness data…'}</Text>
                 {!!error && (
                     <TouchableOpacity onPress={retry}>
-                        <Text>Erneut laden</Text>
+                        <Text>Try again</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -154,7 +193,7 @@ export default function HomeScreen() {
 
     return (
         <>
-            <ScrollView style={styles.container}>
+            <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
                 <Header onCalendarPress={() => setShowCalendar(true)} />
 
                 <Date
@@ -163,8 +202,74 @@ export default function HomeScreen() {
                 />
 
                 <RingsMetrics metrics={metrics} />
-                <XPSection totalXp={totalXp} />
-                <TodayTasks tasks={tasks} toggleTask={toggleTask} />
+
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        gap: 12,
+                        paddingHorizontal: 16,
+                        marginBottom: 16,
+                    }}
+                >
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => promptForAmount('water', entry =>
+                            record({ ...entry, day: selectedDay })
+                        )}
+                        style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            paddingVertical: 12,
+                            borderRadius: 12,
+                            backgroundColor: colors.cyanSecondary,
+                        }}
+                    >
+                        <Ionicons name="water-outline" size={20} color={colors.cyanPrimary} />
+                        <Text style={{ color: colors.cyanPrimary, fontWeight: '600' }}>
+                            Log water
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => promptForAmount('distance', entry =>
+                            record({ ...entry, day: selectedDay })
+                        )}
+                        style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            paddingVertical: 12,
+                            borderRadius: 12,
+                            backgroundColor: colors.blueSecondary,
+                        }}
+                    >
+                        <Ionicons name="walk-outline" size={20} color={colors.bluePrimary} />
+                        <Text style={{ color: colors.bluePrimary, fontWeight: '600' }}>
+                            Log distance
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <XPSection totalXp={totalXp} goal={dailyXpGoal} />
+
+                <TodayTasks
+                    tasks={tasks}
+                    toggleTask={toggleTask}
+                    deleteTask={task => record({
+                        day: selectedDay,
+                        kind: 'delete_task',
+                        label: task.label,
+                    })}
+                />
+
+                <CustomTaskForm key={selectedDay} onAdd={addCustomTask} />
+
                 <CaloriesCounter
                     meals={todayEntries.filter(item => item.kind === 'meal')}
                     onAdd={dish => record({
@@ -173,6 +278,13 @@ export default function HomeScreen() {
                         label: dish.name,
                         amount: dish.kcal,
                     })}
+                />
+
+                <DailyLog
+                    entries={todayEntries}
+                    onAddDistance={() => promptForAmount('distance', entry =>
+                        record({ ...entry, day: selectedDay })
+                    )}
                 />
             </ScrollView>
 
@@ -349,7 +461,124 @@ function CalendarModal({ visible, selectedDate, setSelectedDate, onClose }) {
         </Modal>
     );
 }
+function DailyLog({ entries, onAddDistance }) {
+    const { removeEntry, updateDistance } = useFitness();
+    const items = entries
+        .filter(item => ['meal', 'water', 'distance'].includes(item.kind))
+        .reverse();
 
+    function editDistance(item) {
+        Alert.prompt(
+            'Edit distance',
+            'Enter the corrected distance in kilometers.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Save',
+                    onPress: input => {
+                        const text = (input || '').trim().replace(',', '.');
+                        const meters = Math.round(Number(text) * 1000);
+
+                        if (!/^\d+(?:\.\d{1,3})?$/.test(text) ||
+                            meters < 1 || meters > 1000000) {
+                            Alert.alert(
+                                'Check your distance',
+                                'Enter 0.001 to 1000 km, for example 1.5.'
+                            );
+                            return;
+                        }
+
+                        updateDistance(item.id, meters);
+                    },
+                },
+            ],
+            'plain-text',
+            String(item.amount / 1000),
+            'decimal-pad'
+        );
+    }
+
+    function confirmDelete(item, quantity) {
+        Alert.alert(
+            'Delete this entry?',
+            `${item.label} · ${quantity}`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => removeEntry(item.id),
+                },
+            ]
+        );
+    }
+
+    return (
+        <View style={styles.sectionCard}>
+            <View style={[styles.sectionHeader, { backgroundColor: colors.cyanPrimary }]} />
+
+            <View style={styles.headerContent}>
+                <Text style={styles.sectionHeaderText}>Daily log</Text>
+            </View>
+
+            <View style={styles.sectionContent}>
+                <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={onAddDistance}
+                    style={styles.sectionRow}
+                >
+                    <Ionicons name="add-circle-outline" size={24} color={colors.bluePrimary} />
+                    <Text style={styles.mealText}>Log distance</Text>
+                </TouchableOpacity>
+
+                {items.length === 0 && (
+                    <Text style={styles.nutritionText}>
+                        No food, water or distance logged for this day.
+                    </Text>
+                )}
+
+                {items.map(item => {
+                    const isDistance = item.kind === 'distance';
+                    let quantity = `${item.amount} kcal`;
+
+                    if (isDistance) quantity = `${item.amount / 1000} km`;
+                    if (item.kind === 'water') quantity = `${item.amount} ml`;
+
+                    return (
+                        <View key={item.id} style={styles.sectionRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.mealText}>
+                                    {isDistance ? 'Distance' : item.label}
+                                </Text>
+                                <Text style={styles.nutritionText}>{quantity}</Text>
+                            </View>
+
+                            {isDistance && (
+                                <TouchableOpacity
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Edit distance, ${quantity}`}
+                                    onPress={() => editDistance(item)}
+                                    style={{ padding: 10 }}
+                                >
+                                    <Text style={{ color: colors.bluePrimary }}>Edit</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel={`Delete ${isDistance ? 'distance' : item.label}, ${quantity}`}
+                                onPress={() => confirmDelete(item, quantity)}
+                                style={{ padding: 10 }}
+                            >
+                                <Ionicons name="trash-outline" size={22} color="#B3261E" />
+                            </TouchableOpacity>
+                        </View>
+                    );
+                })}
+            </View>
+        </View>
+    );
+}
 function RingsMetrics({ metrics }) {
     return (
         <View style={styles.wrapper}>
@@ -389,8 +618,8 @@ function RingsMetrics({ metrics }) {
     );
 }
 
-function XPSection({ totalXp }) {
-    const xpFillPercent = Math.min(100, (totalXp / XP_GOAL) * 100);
+function XPSection({ totalXp, goal }) {
+    const percent = goal > 0 ? Math.min(100, (totalXp / goal) * 100) : 0;
 
     return (
         <View style={styles.todayXpSection}>
@@ -400,40 +629,188 @@ function XPSection({ totalXp }) {
 
             <View style={styles.todayXpContent}>
                 <Text style={styles.todayXpLabel}>Today's XP</Text>
+
                 <View style={styles.todayXpBarBackground}>
                     <View style={styles.todayXpBarInner}>
-                        <View style={[styles.todayXpBarFill, { width: `${xpFillPercent}%` }]} />
-                        <Text style={styles.todayXpTextOnBar}>{totalXp} / {XP_GOAL} xp</Text>
+                        <View style={[styles.todayXpBarFill, { width: `${percent}%` }]} />
+                        <Text style={styles.todayXpTextOnBar}>
+                            {totalXp} / {goal} xp
+                        </Text>
                     </View>
                 </View>
             </View>
         </View>
     );
 }
+function CustomTaskForm({ onAdd }) {
+    const [name, setName] = useState('');
+    const [xpText, setXpText] = useState('');
+    const [message, setMessage] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-function TodayTasks({ tasks, toggleTask }) {
+    async function submit() {
+        if (submitting) return;
+
+        const label = name.trim();
+        const xp = Number(xpText);
+
+        if (!label) {
+            setMessage('Enter a name for your task.');
+            return;
+        }
+
+        if (!/^\d+$/.test(xpText) || !Number.isInteger(xp) || xp < 1 || xp > 50) {
+            setMessage('Enter a whole number from 1 to 50.');
+            return;
+        }
+
+        setMessage('');
+        setSubmitting(true);
+        try {
+            const saved = await onAdd(label, xp);
+            if (saved) {
+                setName('');
+                setXpText('');
+                setMessage('Task added.');
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    const inputStyle = {
+        borderWidth: 1,
+        borderColor: colors.blueTertiary,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginTop: 8,
+        color: colors.bluePrimary,
+    };
+
+    return (
+        <View style={[styles.sectionCard, { padding: 16 }]}>
+            <Text style={styles.taskText}>Custom daily task</Text>
+
+            <TextInput
+                style={inputStyle}
+                accessibilityLabel="Task name"
+                placeholder="e.g. Walk for 20 minutes"
+                value={name}
+                onChangeText={setName}
+                maxLength={120}
+                editable={!submitting}
+            />
+
+            <TextInput
+                style={inputStyle}
+                accessibilityLabel="XP from 1 to 50"
+                placeholder="XP from 1 to 50"
+                value={xpText}
+                onChangeText={setXpText}
+                keyboardType="number-pad"
+                editable={!submitting}
+            />
+
+            <TouchableOpacity
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={submit}
+                style={{
+                    backgroundColor: colors.bluePrimary,
+                    padding: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    marginTop: 12,
+                }}
+            >
+                <Text style={{ color: 'white' }}>
+                    {submitting ? 'Saving…' : 'Add task'}
+                </Text>
+            </TouchableOpacity>
+
+            {!!message && <Text style={{ marginTop: 8 }}>{message}</Text>}
+        </View>
+    );
+}
+function TodayTasks({ tasks, toggleTask, deleteTask }) {
+    function confirmDelete(task) {
+        const message = task.completed
+            ? `Remove "${task.label}" from this day and subtract ${task.xp} XP?`
+            : `Remove "${task.label}" from this day?`;
+
+        Alert.alert('Delete task?', message, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => deleteTask(task),
+            },
+        ]);
+    }
+
     return (
         <View style={styles.sectionCard}>
-            <View style={[styles.sectionHeader, { backgroundColor: colors.bluePrimary }]} />
+            <View
+                style={[
+                    styles.sectionHeader,
+                    { backgroundColor: colors.bluePrimary },
+                ]}
+            />
+
             <View style={styles.headerContent}>
-                <Text style={styles.sectionHeaderText}>Tasks for today</Text>
+                <Text style={styles.sectionHeaderText}>Daily tasks</Text>
             </View>
 
             <View style={styles.sectionContent}>
-                {tasks.map((task, i) => (
-                    <TouchableOpacity
-                        key={i}
-                        onPress={() => toggleTask(task)}
-                        style={styles.sectionRow}
-                    >
-                        <Ionicons
-                            name={task.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                            size={30}
-                            color={task.completed ? colors.cyanPrimary : colors.blueTertiary}
-                        />
-                        <Text style={styles.taskText}>{task.label}</Text>
-                        <Text style={styles.taskXp}>+ {task.xp} xp</Text>
-                    </TouchableOpacity>
+                {tasks.length === 0 && (
+                    <Text style={styles.nutritionText}>
+                        No tasks for this day.
+                    </Text>
+                )}
+
+                {tasks.map(task => (
+                    <View key={task.label} style={styles.sectionRow}>
+                        <TouchableOpacity
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: task.completed }}
+                            accessibilityLabel={`${task.label}, ${task.xp} XP`}
+                            onPress={() => toggleTask(task)}
+                            style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 8,
+                                minHeight: 44,
+                            }}
+                        >
+                            <Ionicons
+                                name={task.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                                size={28}
+                                color={task.completed ? colors.cyanPrimary : colors.blueTertiary}
+                            />
+
+                            <Text style={[styles.taskText, { flex: 1 }]}>
+                                {task.label}
+                            </Text>
+
+                            <Text style={styles.taskXp}>+{task.xp} XP</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete task: ${task.label}`}
+                            onPress={() => confirmDelete(task)}
+                            style={{
+                                width: 44,
+                                minHeight: 44,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Ionicons name="trash-outline" size={21} color="#B3261E" />
+                        </TouchableOpacity>
+                    </View>
                 ))}
             </View>
         </View>
@@ -449,7 +826,7 @@ function CaloriesCounter({ meals, onAdd }) {
             <View style={[styles.sectionHeader, { backgroundColor: colors.orangePrimary }]} />
 
             <View style={styles.headerContent}>
-                <Text style={styles.sectionHeaderText}>Mahlzeiten · {total} kcal</Text>
+                <Text style={styles.sectionHeaderText}>Meals · {total} kcal</Text>
             </View>
 
             <View style={styles.sectionContent}>
@@ -479,7 +856,7 @@ function CaloriesCounter({ meals, onAdd }) {
                                 key={dish.name}
                                 style={styles.dishContainer}
                                 accessibilityRole="button"
-                                accessibilityLabel={`${dish.name} als gegessen eintragen`}
+                                accessibilityLabel={`Log ${dish.name}`}
                                 onPress={() => onAdd(dish)}
                             >
                                 <View style={styles.dishRow}>
@@ -494,10 +871,10 @@ function CaloriesCounter({ meals, onAdd }) {
                     </View>
                 ))}
 
-                <Text style={styles.dishLabel}>Am ausgewählten Tag gegessen</Text>
+                <Text style={styles.dishLabel}>Meals logged for this day</Text>
 
                 {meals.length === 0 ? (
-                    <Text style={styles.nutritionText}>Noch keine Mahlzeit eingetragen.</Text>
+                    <Text style={styles.nutritionText}>No meals logged yet.</Text>
                 ) : (
                     meals.map(meal => (
                         <View key={meal.id} style={styles.dishRow}>

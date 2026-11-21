@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import HomeScreen from '../screens/HomeScreen';
 import HubsScreen from '../screens/HubsScreen';
+import { promptForAmount } from '../logAmount';
 import IdeasScreen from '../screens/IdeasScreen';
 import { useFitness } from '../context/FitnessContext';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -120,53 +121,32 @@ function NavigationTab({ setModalVisible }) {
 
 function PopupMenu({ modalVisible, setModalVisible }) {
     const { record, ready } = useFitness();
+    const [pendingKind, setPendingKind] = useState(null);
 
-    function addWater() {
-        closePopup();
-        record({ kind: 'water', label: 'Wasser', amount: 250 });
+    function closePopup() {
+        setModalVisible(false);
     }
 
     function enterAmount(kind) {
+        setPendingKind(kind);
         closePopup();
-        const isMeal = kind === 'meal';
-
-        // Der Systemdialog erscheint, sobald das iOS-Menü geschlossen ist.
-        setTimeout(() => {
-            Alert.prompt(
-                isMeal ? 'Mahlzeit eintragen' : 'Strecke eintragen',
-                isMeal ? 'Wie viele kcal?' : 'Wie viele Meter?',
-                [
-                    { text: 'Abbrechen', style: 'cancel' },
-                    {
-                        text: 'Speichern',
-                        onPress: text => {
-                            const value = Number((text || '').trim());
-                            if (!Number.isInteger(value) || value <= 0 || value > 1000000) {
-                                Alert.alert('Bitte eine positive ganze Zahl eingeben.');
-                                return;
-                            }
-                            record({
-                                kind,
-                                label: isMeal ? 'Mahlzeit' : 'Aktivität',
-                                amount: value,
-                            });
-                        },
-                    },
-                ],
-                'plain-text',
-                '',
-                'number-pad'
-            );
-        }, 400);
     }
-    const closePopup = () => setModalVisible(false);
+
+    function showAmountAfterDismiss() {
+        if (!pendingKind) return;
+
+        const kind = pendingKind;
+        setPendingKind(null);
+        promptForAmount(kind, record);
+    }
 
     return (
         <Modal
-            transparent={true}
+            transparent
             animationType="slide"
             visible={modalVisible}
             onRequestClose={closePopup}
+            onDismiss={showAmountAfterDismiss}
         >
             <SafeAreaView style={styles.modalOverlay}>
                 <View style={styles.styledModal}>
@@ -193,11 +173,11 @@ function PopupMenu({ modalVisible, setModalVisible }) {
                         <TouchableOpacity
                             style={[styles.button, { backgroundColor: colors.cyanSecondary }]}
                             disabled={!ready}
-                            onPress={addWater}
+                            onPress={() => enterAmount('water')}
                         >
                             <Ionicons name="water-outline" size={20} color={colors.cyanPrimary} />
                             <Text style={[styles.buttonText, { color: colors.cyanPrimary }]}>
-                                + 250 ml Wasser
+                                Log water
                             </Text>
                         </TouchableOpacity>
 
@@ -218,7 +198,7 @@ function PopupMenu({ modalVisible, setModalVisible }) {
                         >
                             <Ionicons name="scan-outline" size={20} color={colors.orangePrimary} />
                             <Text style={[styles.buttonText, { color: colors.orangePrimary }]}>
-                                AI Meal Scan (bald verfügbar)
+                                AI Meal Scan (coming soon)
                             </Text>
                         </TouchableOpacity>
                     </View>

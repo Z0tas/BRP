@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, LayoutAnimation } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFavorites } from '../context/FavoritesContext';
-import { useFitness, dayKey, sumEntries } from '../context/FitnessContext';
+import { useFitness, useTodayKey, dayKey, sumEntries } from '../context/FitnessContext';
+import EditProfileForm from './EditProfileForm';
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { API_URL, useAuth } from '../context/AuthContext';
@@ -42,6 +43,7 @@ const CATEGORY_COLORS = {
 export default function ProfileScreen({ navigation }) {
     const { session, setSession, updateAvatar } = useAuth();
     const [savingPhoto, setSavingPhoto] = useState(false);
+    const [editingProfile, setEditingProfile] = useState(false);
     const user = session.user;
     const { entries, ready, error, retry } = useFitness();
     const now = new Date();
@@ -54,16 +56,19 @@ export default function ProfileScreen({ navigation }) {
         return entries.filter(item => item.day === dayKey(date));
     });
 
-    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const chartData = {
         Distance: week.map(rows => sumEntries(rows, 'distance') / 1000),
         Calories: week.map(rows => sumEntries(rows, 'meal')),
         Hydration: week.map(rows => sumEntries(rows, 'water')),
     };
 
-    const totalXp = sumEntries(entries, 'task');
-    const level = Math.floor(totalXp / 1200);
-    const levelXp = totalXp % 1200;
+    const today = useTodayKey();
+    const dailyXp = sumEntries(entries.filter(item => item.day === today), 'task');
+
+    const lifetimeXp = sumEntries(entries, 'task');
+    const level = Math.floor(lifetimeXp / 1200);
+    const levelXp = lifetimeXp % 1200;
 
     let age = null;
     if (user.birthDate) {
@@ -91,7 +96,7 @@ export default function ProfileScreen({ navigation }) {
 
             const image = picked.assets[0]?.base64;
             if (!image || image.length > 12 * 1024 * 1024) {
-                Alert.alert('Profilfoto', 'Bitte ein kleineres Foto auswählen.');
+                Alert.alert('Profile photo', 'Please choose a smaller photo.');
                 return;
             }
 
@@ -105,19 +110,19 @@ export default function ProfileScreen({ navigation }) {
             });
 
             if (response.status === 401) {
-                Alert.alert('Sitzung abgelaufen', 'Bitte melde dich erneut an.');
+                Alert.alert('Session expired', 'Please log in again.');
                 setSession(null);
                 return;
             }
 
             if (!response.ok) {
-                throw new Error('Das Foto konnte nicht gespeichert werden.');
+                throw new Error('Could not save your photo.');
             }
 
             const result = await response.json();
             updateAvatar(result.avatar);
         } catch (error) {
-            Alert.alert('Profilfoto', error.message);
+            Alert.alert('Profile photo', error.message);
         } finally {
             setSavingPhoto(false);
         }
@@ -131,11 +136,11 @@ export default function ProfileScreen({ navigation }) {
             });
 
             if (!response.ok && response.status !== 401) {
-                throw new Error('Abmeldung fehlgeschlagen.');
+                throw new Error('Could not log out.');
             }
             setSession(null);
         } catch (error) {
-            Alert.alert('Abmelden', error.message);
+            Alert.alert('Log out', error.message);
         }
     }
     const [selectedCategory, setSelectedCategory] = useState('Calories');
@@ -170,13 +175,17 @@ export default function ProfileScreen({ navigation }) {
 
     return (
         <SafeAreaProvider>
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+            >
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <View style={styles.headerSide}>
                         <TouchableOpacity
                             onPress={logout}
-                            accessibilityLabel="Abmelden"
+                            accessibilityLabel="Log out"
                         >
                             <Ionicons
                                 name="arrow-back"
@@ -206,40 +215,52 @@ export default function ProfileScreen({ navigation }) {
                         onPress={choosePhoto}
                         disabled={savingPhoto}
                         accessibilityRole="button"
-                        accessibilityLabel="Profilfoto aus der Galerie auswählen"
-                        style={{ alignItems: 'center' }}
+                        accessibilityLabel="Choose a profile photo from your library"
+                        style={styles.photoButton}
                     >
                         {user.avatar ? (
                             <Image source={{ uri: user.avatar }} style={styles.profileImage} />
                         ) : (
-                            <View
-                                style={[
-                                    styles.profileImage,
-                                    {
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: colors.blueSecondary,
-                                    },
-                                ]}
-                            >
-                                <Ionicons name="person-outline" size={36} color={colors.bluePrimary} />
+                            <View style={[styles.profileImage, styles.emptyAvatar]}>
+                                <Ionicons
+                                    name="person-outline"
+                                    size={36}
+                                    color={colors.bluePrimary}
+                                />
                             </View>
                         )}
 
-                        <Text style={{ color: colors.bluePrimary }}>
-                            {savingPhoto ? 'Speichert …' : user.avatar ? 'Foto ändern' : 'Foto wählen'}
+                        <Text style={styles.photoCaption}>
+                            {savingPhoto ? 'Saving…' : user.avatar ? 'Change photo' : 'Choose photo'}
                         </Text>
                     </TouchableOpacity>
 
-                    <View style={[styles.profileInfo, { flex: 1 }]}>
+                    <View style={styles.profileInfo}>
                         <Text style={styles.profileName}>{user.fullName || user.email}</Text>
                         <Text style={styles.profileDetailText}>{user.email}</Text>
-                        {age !== null && <Text style={styles.profileDetailText}>{age} Jahre</Text>}
+
+                        {age !== null && (
+                            <Text style={styles.profileDetailText}>{age} years old</Text>
+                        )}
+
                         {!!user.university && (
                             <Text style={styles.profileDetailText}>{user.university}</Text>
                         )}
+
+                        {!editingProfile && (
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                onPress={() => setEditingProfile(true)}
+                            >
+                                <Text style={styles.editProfileLink}>Edit profile</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
+
+                {editingProfile && (
+                    <EditProfileForm onClose={() => setEditingProfile(false)} />
+                )}
 
                 {/* XP Progress Bar */}
                 <View style={styles.xpSection}>
@@ -248,11 +269,12 @@ export default function ProfileScreen({ navigation }) {
                     </View>
                     {!ready && (
                         <TouchableOpacity disabled={!error} onPress={retry}>
-                            <Text>{error ? `${error} · Erneut laden` : 'Fitnessdaten werden geladen …'}</Text>
+                            <Text>{error ? `${error} · Try again` : 'Loading fitness data…'}</Text>
                         </TouchableOpacity>
                     )}
                     <View style={styles.xpContainer}>
-                        <Text style={styles.levelLabel}>Level</Text>
+                        <Text style={styles.levelLabel}>Today's XP: {dailyXp}</Text>
+                        <Text style={styles.profileDetailText}>Level progress</Text>
                         <View style={styles.xpBarContainer}>
                             <View style={styles.xpBarBackground}>
                                 <View style={styles.xpBarInner}>
@@ -427,18 +449,41 @@ const styles = StyleSheet.create({
     profileSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 24,
-        marginLeft: 24
+        paddingHorizontal: 20,
+        columnGap: 16,
+        marginBottom: 20,
+    },
+    photoButton: {
+        width: 104,
+        alignItems: 'center',
     },
     profileImage: {
-        width: 90,
-        height: 90,
-        borderRadius: 80,
-        marginRight: 16
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+    },
+    emptyAvatar: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.blueSecondary,
+    },
+    photoCaption: {
+        marginTop: 6,
+        width: '100%',
+        textAlign: 'center',
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.bluePrimary,
     },
     profileInfo: {
         flex: 1,
-        marginLeft: 24
+        minWidth: 0,
+    },
+    editProfileLink: {
+        alignSelf: 'flex-start',
+        paddingVertical: 8,
+        fontWeight: '600',
+        color: colors.bluePrimary,
     },
     profileName: {
         fontSize: 18,

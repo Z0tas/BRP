@@ -39,7 +39,7 @@ app.post('/auth/register', async (req, res) => {
     const school = typeof university === 'string' ? university.trim() : '';
 
     if (school.length > 160) {
-        return res.status(400).json({ message: 'Der Hochschulname ist zu lang.' });
+        return res.status(400).json({ message: 'The university name is too long.' });
     }
 
     if (birthDate) {
@@ -50,21 +50,21 @@ app.post('/auth/register', async (req, res) => {
             parsed.toISOString().slice(0, 10) !== birthDate ||
             birthDate > new Date().toLocaleDateString('sv-SE') ||
             birthDate < '1900-01-01') {
-            return res.status(400).json({ message: 'Bitte ein gültiges Geburtsdatum eingeben.' });
+            return res.status(400).json({ message: 'Enter a valid date of birth.' });
         }
     }
 
     if (typeof fullName !== 'string' || !fullName.trim() || fullName.length > 120) {
-        return res.status(400).json({ message: 'Bitte einen gültigen Namen eingeben.' });
+        return res.status(400).json({ message: 'Enter a valid name.' });
     }
 
     const address = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (address.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-        return res.status(400).json({ message: 'Bitte eine gültige E-Mail eingeben.' });
+        return res.status(400).json({ message: 'Enter a valid email address.' });
     }
 
     if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
-        return res.status(400).json({ message: 'Bitte ein Passwort mit 12 bis 128 Zeichen wählen.' });
+        return res.status(400).json({ message: 'Use a password with 12 to 128 characters.' });
     }
 
     try {
@@ -79,17 +79,17 @@ app.post('/auth/register', async (req, res) => {
         return res.status(201).json({ user: result.rows[0] });
     } catch (error) {
         if (error.code === '23505' && error.constraint === 'app_users_email_unique') {
-            return res.status(409).json({ message: 'Diese E-Mail ist bereits registriert.' });
+            return res.status(409).json({ message: 'This email address is already registered.' });
         }
-        console.error('Registrierung fehlgeschlagen:', error.code || error.name);
-        return res.status(500).json({ message: 'Das Konto konnte nicht erstellt werden.' });
+        console.error('Registration fehlgeschlagen:', error.code || error.name);
+        return res.status(500).json({ message: 'Could not create the account.' });
     }
 });
 app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body || {};
     if (typeof email !== 'string' || !email.trim() ||
         typeof password !== 'string' || !password || password.length > 128) {
-        return res.status(400).json({ message: 'Bitte E-Mail und Passwort eingeben.' });
+        return res.status(400).json({ message: 'Enter your email and password.' });
     }
 
     try {
@@ -105,7 +105,7 @@ app.post('/auth/login', async (req, res) => {
             await argon2.verify(user.password_hash, password);
 
         if (!valid) {
-            return res.status(401).json({ message: 'E-Mail oder Passwort ist falsch.' });
+            return res.status(401).json({ message: 'Incorrect email or password.' });
         }
 
         const token = crypto.randomBytes(32).toString('hex');
@@ -132,14 +132,14 @@ app.post('/auth/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login fehlgeschlagen:', error.code || error.name);
-        return res.status(500).json({ message: 'Anmeldung momentan nicht möglich.' });
+        return res.status(500).json({ message: 'Login is temporarily unavailable.' });
     }
 });
 async function requireSession(req, res, next) {
     const header = req.get('authorization') || '';
     const match = /^Bearer ([a-f0-9]{64})$/.exec(header);
     if (!match) {
-        return res.status(401).json({ message: 'Bitte erneut anmelden.' });
+        return res.status(401).json({ message: 'Please log in again.' });
     }
 
     try {
@@ -151,7 +151,7 @@ async function requireSession(req, res, next) {
         );
 
         if (!result.rowCount) {
-            return res.status(401).json({ message: 'Bitte erneut anmelden.' });
+            return res.status(401).json({ message: 'Please log in again.' });
         }
 
         req.userId = result.rows[0].user_id;
@@ -168,7 +168,7 @@ app.put(
     express.text({ type: 'text/plain', limit: '12mb' }),
     async (req, res, next) => {
         if (typeof req.body !== 'string' || !req.body.length) {
-            return res.status(400).json({ message: 'Bitte ein Foto auswählen.' });
+            return res.status(400).json({ message: 'Choose a photo.' });
         }
 
         let jpeg;
@@ -181,7 +181,7 @@ app.put(
                 .jpeg({ quality: 82 })
                 .toBuffer();
         } catch {
-            return res.status(400).json({ message: 'Dieses Bild konnte nicht gelesen werden.' });
+            return res.status(400).json({ message: 'Could not read this image.' });
         }
 
         try {
@@ -218,12 +218,29 @@ const taskPoints = new Map([
 app.get('/me/entries', requireSession, async (req, res, next) => {
     try {
         const result = await db.query(
-            `SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, label, amount
+            `SELECT id, to_char(day, 'YYYY-MM-DD') AS day, kind, CASE WHEN kind='water' AND label='Wasser' THEN 'Water' WHEN kind='meal' AND label='Mahlzeit' THEN 'Meal' WHEN kind='distance' AND label='Aktivität' THEN 'Activity' ELSE label END AS label, amount
              FROM public.fitness_entries
-             WHERE user_id = $1 ORDER BY id`,
+             WHERE user_id = $1
+
+             UNION ALL
+
+             SELECT id, to_char(day, 'YYYY-MM-DD') AS day,
+                    'custom_task' AS kind, label, xp AS amount
+             FROM public.custom_daily_tasks
+             WHERE user_id = $1
+
+            UNION ALL
+
+             SELECT NULL::bigint AS id, to_char(day, 'YYYY-MM-DD') AS day,
+                    'hidden_task' AS kind, label, 0 AS amount
+             FROM public.hidden_daily_tasks
+             WHERE user_id = $1
+
+             ORDER BY day, id, kind`,
             [req.userId]
         );
-        res.json(result.rows);
+
+        return res.json(result.rows);
     } catch (error) {
         next(error);
     }
@@ -232,40 +249,184 @@ app.get('/me/entries', requireSession, async (req, res, next) => {
 app.post('/me/entries', requireSession, async (req, res, next) => {
     const { day, kind, label, amount, completed } = req.body || {};
 
-    const parsed = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)
-        ? new Date(`${day}T00:00:00Z`) : null;
-    if (!parsed || Number.isNaN(parsed.getTime()) ||
-        parsed.toISOString().slice(0, 10) !== day) {
-        return res.status(400).json({ message: 'Ungültiges Datum.' });
+    const parsedDay = typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)
+        ? new Date(`${day}T00:00:00Z`)
+        : null;
+
+    if (!parsedDay || Number.isNaN(parsedDay.getTime()) ||
+        parsedDay.toISOString().slice(0, 10) !== day) {
+        return res.status(400).json({ message: 'Invalid date.' });
     }
 
-    if (!['water', 'distance', 'meal', 'task'].includes(kind) ||
-        typeof label !== 'string' || !label.trim() || label.length > 120) {
-        return res.status(400).json({ message: 'Ungültiger Eintrag.' });
-    }
-
-    const value = kind === 'task' ? taskPoints.get(label) : amount;
-    if (!Number.isInteger(value) || value <= 0 || value > 1000000 ||
-        (kind === 'task' && typeof completed !== 'boolean')) {
-        return res.status(400).json({ message: 'Ungültige Menge oder Aufgabe.' });
+    const name = typeof label === 'string' ? label.trim() : '';
+    if (!name || name.length > 120) {
+        return res.status(400).json({ message: 'Enter a name with 1 to 120 characters.' });
     }
 
     try {
-        if (kind === 'task' && !completed) {
-            await db.query(
-                `DELETE FROM public.fitness_entries
-                 WHERE user_id = $1 AND day = $2 AND kind = 'task' AND label = $3`,
-                [req.userId, day, label]
+        if (kind === 'custom_task') {
+            if (!Number.isInteger(amount) || amount < 1 || amount > 50) {
+                return res.status(400).json({ message: 'Choose a whole number from 1 to 50 XP.' });
+            }
+
+            const isStandardTask = [...taskPoints.keys()].some(
+                taskName => taskName.toLowerCase() === name.toLowerCase()
             );
-        } else {
-            await db.query(
-                `INSERT INTO public.fitness_entries (user_id, day, kind, label, amount)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT DO NOTHING`,
-                [req.userId, day, kind, label.trim(), value]
+
+            if (isStandardTask) {
+                return res.status(409).json({ message: 'This default task already exists.' });
+            }
+
+            const result = await db.query(
+                `INSERT INTO public.custom_daily_tasks (user_id, day, label, xp)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT DO NOTHING
+                 RETURNING id`,
+                [req.userId, day, name, amount]
             );
+
+            if (!result.rowCount) {
+                return res.status(409).json({ message: 'This task already exists for this day.' });
+            }
+
+            return res.sendStatus(201);
         }
-        res.sendStatus(204);
+
+        if (kind === 'task' || kind === 'delete_task') {
+            if (kind === 'task' && typeof completed !== 'boolean') {
+                return res.status(400).json({ message: 'The task status is missing.' });
+            }
+
+            const client = await db.connect();
+
+            try {
+                await client.query('BEGIN');
+
+                // Keep simultaneous task changes for this account in order.
+                await client.query(
+                    'SELECT id FROM public.app_users WHERE id = $1 FOR UPDATE',
+                    [req.userId]
+                );
+
+                const params = [req.userId, day, name];
+                const isDefault = taskPoints.has(name);
+
+                if (kind === 'delete_task') {
+                    if (isDefault) {
+                        await client.query(
+                            `INSERT INTO public.hidden_daily_tasks (user_id, day, label)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT DO NOTHING`,
+                            params
+                        );
+                    } else {
+                        await client.query(
+                            `DELETE FROM public.custom_daily_tasks
+                     WHERE user_id = $1 AND day = $2 AND label = $3`,
+                            params
+                        );
+                    }
+
+                    await client.query(
+                        `DELETE FROM public.fitness_entries
+                 WHERE user_id = $1 AND day = $2 AND label = $3 AND kind = 'task'`,
+                        params
+                    );
+                } else {
+                    let points = taskPoints.get(name);
+
+                    if (isDefault) {
+                        const hidden = await client.query(
+                            `SELECT 1 FROM public.hidden_daily_tasks
+                     WHERE user_id = $1 AND day = $2 AND label = $3`,
+                            params
+                        );
+                        if (hidden.rowCount) points = undefined;
+                    } else {
+                        const custom = await client.query(
+                            `SELECT xp FROM public.custom_daily_tasks
+                     WHERE user_id = $1 AND day = $2 AND label = $3`,
+                            params
+                        );
+                        points = custom.rows[0]?.xp;
+                    }
+
+                    if (points === undefined) {
+                        await client.query('ROLLBACK');
+                        return res.status(404).json({ message: 'Task not found for this day.' });
+                    }
+
+                    if (completed) {
+                        await client.query(
+                            `INSERT INTO public.fitness_entries (user_id, day, label, kind, amount)
+                     VALUES ($1, $2, $3, 'task', $4)
+                     ON CONFLICT DO NOTHING`,
+                            [...params, points]
+                        );
+                    } else {
+                        await client.query(
+                            `DELETE FROM public.fitness_entries
+                     WHERE user_id = $1 AND day = $2 AND label = $3 AND kind = 'task'`,
+                            params
+                        );
+                    }
+                }
+
+                await client.query('COMMIT');
+                return res.sendStatus(204);
+            } catch (error) {
+                await client.query('ROLLBACK');
+                throw error;
+            } finally {
+                client.release();
+            }
+        }
+
+        if (!['water', 'distance', 'meal'].includes(kind) ||
+            !Number.isInteger(amount) || amount <= 0 || amount > 1000000) {
+            return res.status(400).json({ message: 'Invalid entry or amount.' });
+        }
+
+        await db.query(
+            `INSERT INTO public.fitness_entries (user_id, day, kind, label, amount)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [req.userId, day, kind, name, amount]
+        );
+
+        return res.sendStatus(204);
+    } catch (error) {
+        next(error);
+    }
+});
+app.patch('/me/entries/:id/distance', requireSession, async (req, res, next) => {
+    const { id } = req.params;
+    const { amount } = req.body || {};
+
+    if (!/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > 9223372036854775807n) {
+        return res.status(400).json({ message: 'Invalid entry ID.' });
+    }
+
+    // Distance is stored in whole meters.
+    if (!Number.isInteger(amount) || amount < 1 || amount > 1000000) {
+        return res.status(400).json({
+            message: 'Enter a distance between 0.001 and 1000 km.',
+        });
+    }
+
+    try {
+        const result = await db.query(
+            `UPDATE public.fitness_entries
+             SET amount = $1
+             WHERE id = $2 AND user_id = $3 AND kind = 'distance'
+             RETURNING id, amount`,
+            [amount, id, req.userId]
+        );
+
+        if (!result.rowCount) {
+            return res.status(404).json({ message: 'Distance entry not found.' });
+        }
+
+        return res.json(result.rows[0]);
     } catch (error) {
         next(error);
     }
@@ -274,7 +435,7 @@ app.delete('/me/entries/:id', requireSession, async (req, res, next) => {
     const id = req.params.id;
 
     if (!/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > 9223372036854775807n) {
-        return res.status(400).json({ message: 'Ungültige Eintragsnummer.' });
+        return res.status(400).json({ message: 'Invalid entry ID.' });
     }
 
     try {
@@ -282,7 +443,7 @@ app.delete('/me/entries/:id', requireSession, async (req, res, next) => {
             `DELETE FROM public.fitness_entries
              WHERE id = $1
                AND user_id = $2
-               AND kind IN ('meal', 'water')`,
+               AND kind IN ('meal', 'water', 'distance')`,
             [id, req.userId]
         );
 
@@ -291,6 +452,66 @@ app.delete('/me/entries/:id', requireSession, async (req, res, next) => {
         next(error);
     }
 });
+app.patch('/me/profile', requireSession, async (req, res, next) => {
+    const { fullName, university, birthDate } = req.body || {};
+
+    if (typeof fullName !== 'string' ||
+        !fullName.trim() ||
+        fullName.trim().length > 120) {
+        return res.status(400).json({
+            message: 'Enter a name with 1 to 120 characters.',
+        });
+    }
+
+    if (typeof university !== 'string' || university.trim().length > 160) {
+        return res.status(400).json({
+            message: 'Use up to 160 characters for your university.',
+        });
+    }
+
+    if (typeof birthDate !== 'string') {
+        return res.status(400).json({ message: 'Enter a valid date of birth.' });
+    }
+
+    if (birthDate !== '') {
+        const parsed = /^\d{4}-\d{2}-\d{2}$/.test(birthDate)
+            ? new Date(`${birthDate}T00:00:00Z`)
+            : null;
+
+        const today = new Date().toLocaleDateString('sv-SE');
+
+        if (!parsed || Number.isNaN(parsed.getTime()) ||
+            parsed.toISOString().slice(0, 10) !== birthDate ||
+            birthDate < '1900-01-01' || birthDate > today) {
+            return res.status(400).json({ message: 'Enter a valid date of birth.' });
+        }
+    }
+
+    try {
+        const result = await db.query(
+            `UPDATE public.app_users
+             SET full_name = $1, university = $2, birth_date = $3
+             WHERE id = $4
+             RETURNING full_name AS "fullName",
+                       university,
+                       to_char(birth_date, 'YYYY-MM-DD') AS "birthDate"`,
+            [
+                fullName.trim(),
+                university.trim() || null,
+                birthDate || null,
+                req.userId,
+            ]
+        );
+
+        if (!result.rowCount) {
+            return res.status(404).json({ message: 'Account not found.' });
+        }
+
+        return res.json(result.rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
 app.listen(port, '0.0.0.0', () => {
-    console.log(`Backend läuft auf Port ${port}`);
+    console.log(`Backend listening on port ${port}`);
 });

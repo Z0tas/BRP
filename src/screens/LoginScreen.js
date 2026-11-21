@@ -34,7 +34,7 @@ export default function LoginScreen({ navigation }) {
         if (busy) return;
 
         if (!email.trim() || !password) {
-            Alert.alert('Login', 'Bitte E-Mail und Passwort eingeben.');
+            Alert.alert('Login', 'Enter your email and password.');
             return;
         }
 
@@ -49,13 +49,13 @@ export default function LoginScreen({ navigation }) {
 
             const result = await response.json();
             if (!response.ok) {
-                Alert.alert('Login', result.message || 'Anmeldung fehlgeschlagen.');
+                Alert.alert('Login', result.message || 'Login failed.');
                 return;
             }
 
             setSession({ token: result.token, user: result.user });
         } catch {
-            Alert.alert('Login', 'Keine gültige Antwort vom Backend erhalten.');
+            Alert.alert('Login', 'Could not get a valid response from the server.');
         } finally {
             setBusy(false);
         }

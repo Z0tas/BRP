@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
     View,
     Text,
@@ -28,6 +29,8 @@ export default function RegisterScreen({ navigation }) {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [birthDate, setBirthDate] = useState('');
+    const [calendarOpen, setCalendarOpen] = useState(false);
+    const [selectedBirthday, setSelectedBirthday] = useState(new Date(2000, 0, 1));
     const [university, setUniversity] = useState('');
     const [password, setPassword] = useState('');
     const [confirmation, setConfirmation] = useState('');
@@ -37,12 +40,12 @@ export default function RegisterScreen({ navigation }) {
         if (busy) return;
 
         if (password !== confirmation) {
-            Alert.alert('Registrierung', 'Die Passwörter stimmen nicht überein.');
+            Alert.alert('Registration', 'The passwords do not match.');
             return;
         }
 
         if (!accepted) {
-            Alert.alert('Registrierung', 'Bitte bestätige die Bedingungen.');
+            Alert.alert('Registration', 'Please accept the terms.');
             return;
         }
 
@@ -61,17 +64,17 @@ export default function RegisterScreen({ navigation }) {
 
             const result = await response.json();
             if (!response.ok) {
-                Alert.alert('Registrierung', result.message || 'Registrierung fehlgeschlagen.');
+                Alert.alert('Registration', result.message || 'Registration failed.');
                 return;
             }
 
-            Alert.alert('Konto erstellt', `Registriert als ${result.user.email}`, [
-                { text: 'Zum Login', onPress: () => navigation.navigate('Login') },
+            Alert.alert('Account created', `Registered as ${result.user.email}`, [
+                { text: 'Go to login', onPress: () => navigation.navigate('Login') },
             ]);
         } catch {
             Alert.alert(
-                'Verbindungsfehler',
-                'Die App hat keine gültige Antwort vom Backend erhalten. Prüfe, ob der Server läuft und das iPhone die Backend-Adresse erreichen kann.'
+                'Connection error',
+                'Could not reach the server. Check that the backend is running and reachable from your iPhone.'
             );
         } finally {
             setBusy(false);
@@ -116,24 +119,74 @@ export default function RegisterScreen({ navigation }) {
                         onChangeText={setFullName}
                     />
                 </View>
-                <Text style={styles.label}>Geburtsdatum (optional)</Text>
-                <View style={styles.inputBox}>
-                    <TextInput
-                        style={styles.input}
-                        value={birthDate}
-                        onChangeText={setBirthDate}
-                        placeholder="JJJJ-MM-TT"
-                        maxLength={10}
-                    />
-                </View>
+                <Text style={styles.label}>Date of birth (optional)</Text>
 
-                <Text style={styles.label}>Hochschule (optional)</Text>
+                <TouchableOpacity
+                    style={styles.inputBox}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose date of birth"
+                    onPress={() => {
+                        if (birthDate) {
+                            const [year, month, day] = birthDate.split('-').map(Number);
+                            setSelectedBirthday(new Date(year, month - 1, day, 12));
+                        }
+                        setCalendarOpen(true);
+                    }}
+                >
+                    <Text style={styles.input}>
+                        {birthDate || 'Select your date of birth'}
+                    </Text>
+                </TouchableOpacity>
+
+                {calendarOpen && (
+                    <View>
+                        <DateTimePicker
+                            value={selectedBirthday}
+                            mode="date"
+                            display="inline"
+                            locale="en-GB"
+                            minimumDate={new Date(1900, 0, 1)}
+                            maximumDate={new Date()}
+                            onValueChange={(_event, date) => {
+                                if (date) setSelectedBirthday(date);
+                            }}
+                        />
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 20 }}>
+                            {birthDate !== '' && (
+                                <TouchableOpacity onPress={() => {
+                                    setBirthDate('');
+                                    setCalendarOpen(false);
+                                }}>
+                                    <Text style={styles.linkText}>Clear</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            <TouchableOpacity onPress={() => setCalendarOpen(false)}>
+                                <Text style={styles.linkText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => {
+                                const year = selectedBirthday.getFullYear();
+                                const month = String(selectedBirthday.getMonth() + 1).padStart(2, '0');
+                                const day = String(selectedBirthday.getDate()).padStart(2, '0');
+
+                                setBirthDate(`${year}-${month}-${day}`);
+                                setCalendarOpen(false);
+                            }}>
+                                <Text style={styles.linkText}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                <Text style={styles.label}>University (optional)</Text>
                 <View style={styles.inputBox}>
                     <TextInput
                         style={styles.input}
                         value={university}
                         onChangeText={setUniversity}
-                        placeholder="z. B. TU Wien"
+                        placeholder="e.g. TU Wien"
                         maxLength={160}
                     />
                 </View>
