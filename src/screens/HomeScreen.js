@@ -229,7 +229,7 @@ export default function HomeScreen() {
                     >
                         <Ionicons name="water-outline" size={20} color={colors.cyanPrimary} />
                         <Text style={{ color: colors.cyanPrimary, fontWeight: '600' }}>
-                            Log water
+                            Add water
                         </Text>
                     </TouchableOpacity>
 
@@ -251,7 +251,7 @@ export default function HomeScreen() {
                     >
                         <Ionicons name="walk-outline" size={20} color={colors.bluePrimary} />
                         <Text style={{ color: colors.bluePrimary, fontWeight: '600' }}>
-                            Log distance
+                            Add distance
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -528,7 +528,7 @@ function DailyLog({ entries, onAddDistance }) {
                     style={styles.sectionRow}
                 >
                     <Ionicons name="add-circle-outline" size={24} color={colors.bluePrimary} />
-                    <Text style={styles.mealText}>Log distance</Text>
+                    <Text style={styles.mealText}>Add distance</Text>
                 </TouchableOpacity>
 
                 {items.length === 0 && (
