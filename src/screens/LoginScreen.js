@@ -122,11 +122,11 @@ export default function LoginScreen({ navigation }) {
                     <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={styles.skipButton}
+                    style={styles.mainButton}
                     onPress={handleLogin}
                     disabled={busy}
                 >
-                    <Text style={styles.skipButtonText}>
+                    <Text style={styles.mainButtonText}>
                         {busy ? 'Logging in…' : 'Log In'}
                     </Text>
                 </TouchableOpacity>
