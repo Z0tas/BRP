@@ -84,7 +84,7 @@ export default function LoginScreen({ navigation }) {
                 <View style={styles.ringOrange} />
             </View>
 
-            <Text style={styles.title}>BRP_Fitness_App</Text>
+            <Text style={styles.title}>FitBloop</Text>
             <Text style={styles.subtitle}>Build healthy habits everyday</Text>
 
             <View style={styles.form}>
@@ -121,7 +121,6 @@ export default function LoginScreen({ navigation }) {
                 <TouchableOpacity style={styles.forgotButton}>
                     <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                     style={styles.skipButton}
                     onPress={handleLogin}
@@ -131,13 +130,6 @@ export default function LoginScreen({ navigation }) {
                         {busy ? 'Logging in…' : 'Log In'}
                     </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.skipButton}
-                    onPress={() => navigation.replace('MainApp')}
-                >
-                    <Text style={styles.skipButtonText}>Continue without Login</Text>
-                </TouchableOpacity>
-
                 <View style={styles.orRow}>
                     <View style={styles.line} />
                     <Text style={styles.orText}>OR</Text>

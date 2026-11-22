@@ -104,7 +104,7 @@ export default function RegisterScreen({ navigation }) {
                 <View style={styles.ringOrange} />
             </View>
 
-            <Text style={styles.title}>BRP_Fitness_App</Text>
+            <Text style={styles.title}>FitBloop</Text>
             <Text style={styles.subtitle}>Build healthy habits everyday</Text>
 
             <View style={styles.form}>

@@ -202,11 +202,20 @@ export default function ProfileScreen({ navigation }) {
                         <TouchableOpacity onPress={() => { /* share action */ }}>
                             <Ionicons name="share-outline" size={24} color={colors.bluePrimary} />
                         </TouchableOpacity>
-                        <TouchableOpacity>
-                            <Ionicons name="settings-outline" size={24} color={colors.bluePrimary} style={styles.iconSpacing} />
+                        <TouchableOpacity
+                            onPress={() => setEditingProfile(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit profile"
+                            style={styles.iconSpacing}
+                            hitSlop={8}
+                        >
+                            <Ionicons
+                                name="settings-outline"
+                                size={24}
+                                color={colors.bluePrimary}
+                            />
                         </TouchableOpacity>
                     </View>
-
                 </View>
 
                 {/* Profile Info */}
